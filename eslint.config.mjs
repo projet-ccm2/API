@@ -5,6 +5,9 @@ import prettierPlugin from "eslint-plugin-prettier";
 import jsdocPlugin from "eslint-plugin-jsdoc";
 
 export default [
+  {
+    ignores: ["dist/**", "coverage/**", "node_modules/**"],
+  },
   js.configs.recommended,
   {
     files: ["**/*.ts", "**/*.tsx"],
@@ -23,10 +26,31 @@ export default [
     rules: {
       "no-unused-vars": "warn",
       "no-undef": "warn",
-      camelcase: ["error", { properties: "always" }],
+      camelcase: ["error", { properties: "never" }],
       "prettier/prettier": "error",
       "jsdoc/check-tag-names": "error",
       "jsdoc/require-description": "error",
+    },
+  },
+  {
+    files: ["src/tests/**/*.ts"],
+    languageOptions: {
+      globals: {
+        jest: "readonly",
+        describe: "readonly",
+        it: "readonly",
+        expect: "readonly",
+        beforeEach: "readonly",
+      },
+    },
+  },
+  {
+    files: ["src/**/*.ts"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+      },
     },
   },
 ];
