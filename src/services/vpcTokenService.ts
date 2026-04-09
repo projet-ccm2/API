@@ -19,7 +19,7 @@ function parseJwtExp(token: string): number | null {
   }
 
   try {
-    const payloadPart = parts[1] ?? "";
+    const payloadPart = parts[1] as string;
     const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
     const json = Buffer.from(base64, "base64").toString("utf8");
     const parsed = JSON.parse(json) as { exp?: unknown };
@@ -56,9 +56,7 @@ async function getGcpAuthorizationHeader(audience: string): Promise<string> {
   const headersWithGet = headers as { get?: unknown };
   const headerGetter = headersWithGet.get as any;
   const headerValue = isHeadersLike
-    ? (headerGetter?.("Authorization") ??
-      headerGetter?.("authorization") ??
-      null)
+    ? (headerGetter("Authorization") ?? headerGetter("authorization") ?? null)
     : ((headers as { Authorization?: string; authorization?: string })
         .Authorization ??
       (headers as { Authorization?: string; authorization?: string })

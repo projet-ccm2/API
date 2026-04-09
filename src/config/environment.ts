@@ -38,7 +38,7 @@ function parseNumber(value: string | undefined, fallback: number): number {
 }
 
 export const environment: RequiredEnvironment = {
-  dbGatewayUrl: process.env.DB_GATEWAY_URL ?? "http://localhost:3001",
+  dbGatewayUrl: process.env.DB_GATEWAY_BASE_URL ?? "http://localhost:3001",
   authServiceUrl: process.env.AUTH_SERVICE_URL ?? "http://localhost:3000",
   twitchApiUrl: process.env.TWITCH_API_URL ?? "https://id.twitch.tv/oauth2",
   twitchClientId: process.env.TWITCH_CLIENT_ID ?? "",

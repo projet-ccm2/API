@@ -88,4 +88,128 @@ describe("vpcTokenService", () => {
     });
     expect(mockGetIdTokenClient).toHaveBeenCalledTimes(2);
   });
+
+  it("builds single Bearer header in development", async () => {
+    environment.nodeEnv = "development";
+    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
+    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
+
+    const headers = await buildDbGatewayHeaders();
+
+    expect(headers).toEqual({ Authorization: `Bearer ${token}` });
+    expect(mockGetIdTokenClient).not.toHaveBeenCalled();
+  });
+
+  it("caches token when JWT has no exp (token without dots, parts.length < 2)", async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: { token: "plaintoken" },
+    } as never);
+
+    const first = await getVpcToken();
+    const second = await getVpcToken();
+
+    expect(first).toBe("plaintoken");
+    expect(second).toBe("plaintoken");
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("caches token when JWT payload has no numeric exp field", async () => {
+    const header = Buffer.from(JSON.stringify({ alg: "HS256" })).toString(
+      "base64url",
+    );
+    const payload = Buffer.from(JSON.stringify({ sub: "user" })).toString(
+      "base64url",
+    );
+    const tokenNoExp = `${header}.${payload}.sig`;
+    mockedAxios.post.mockResolvedValue({
+      data: { token: tokenNoExp },
+    } as never);
+
+    const first = await getVpcToken();
+    const second = await getVpcToken();
+
+    expect(first).toBe(tokenNoExp);
+    expect(second).toBe(tokenNoExp);
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("caches token when JWT payload is not valid JSON", async () => {
+    const header = Buffer.from("{}").toString("base64url");
+    const badPayload = "!!!not-json!!!";
+    const token = `${header}.${badPayload}.sig`;
+    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
+
+    const first = await getVpcToken();
+    const second = await getVpcToken();
+
+    expect(first).toBe(token);
+    expect(second).toBe(token);
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when getVpcToken response has no token field", async () => {
+    mockedAxios.post.mockResolvedValue({ data: {} } as never);
+
+    await expect(getVpcToken()).rejects.toThrow(
+      "Invalid token response from user-management",
+    );
+  });
+
+  it("throws when GCP headers have no Authorization field (plain object)", async () => {
+    environment.nodeEnv = "production";
+    mockGetRequestHeaders.mockResolvedValue({});
+
+    await expect(getVpcToken()).rejects.toThrow(
+      "Unable to obtain GCP identity token",
+    );
+  });
+
+  it("throws when headers.get() returns null for both Authorization variants", async () => {
+    environment.nodeEnv = "production";
+    mockGetRequestHeaders.mockResolvedValue({
+      get: (_key: string) => null,
+    });
+
+    await expect(getVpcToken()).rejects.toThrow(
+      "Unable to obtain GCP identity token",
+    );
+  });
+
+  it("extracts Authorization via headers.get() method", async () => {
+    environment.nodeEnv = "production";
+    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
+    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
+    mockGetRequestHeaders
+      .mockResolvedValueOnce({
+        get: (key: string) =>
+          key === "Authorization" ? "Bearer gcp-via-get" : null,
+      })
+      .mockResolvedValueOnce({
+        get: (key: string) =>
+          key === "Authorization" ? "Bearer gcp-db-via-get" : null,
+      });
+
+    const headers = await buildDbGatewayHeaders();
+
+    expect(headers.Authorization).toBe("Bearer gcp-db-via-get");
+  });
+
+  it("extracts Authorization via headers.get() using lowercase fallback", async () => {
+    environment.nodeEnv = "production";
+    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
+    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
+    mockGetRequestHeaders
+      .mockResolvedValueOnce({
+        get: (key: string) =>
+          key === "authorization" ? "Bearer gcp-lowercase" : null,
+      })
+      .mockResolvedValueOnce({
+        get: (key: string) =>
+          key === "authorization" ? "Bearer gcp-db-lowercase" : null,
+      });
+
+    const headers = await buildDbGatewayHeaders();
+
+    expect(headers.Authorization).toBe("Bearer gcp-db-lowercase");
+  });
 });

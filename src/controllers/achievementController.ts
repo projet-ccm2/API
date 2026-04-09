@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import {
   AlreadyAchievedError,
   insertAchieved,
@@ -29,6 +29,7 @@ function readBody(body: ValidateRequestBody): {
 export async function verifyAndAttachUser(
   req: Request,
   res: Response,
+  next: NextFunction,
 ): Promise<void> {
   const payload = req.body as ValidateRequestBody;
   const { twitchToken, achievementId } = readBody(payload);
@@ -46,6 +47,7 @@ export async function verifyAndAttachUser(
     res.locals.achievementId = achievementId;
     res.locals.twitchLogin = twitchUser.login;
     res.locals.twitchExpiresIn = twitchUser.expiresIn;
+    next();
   } catch (error: unknown) {
     if (error instanceof TwitchUnauthorizedError) {
       res.status(401).json({ error: "Invalid or expired Twitch token" });
