@@ -1,4 +1,4 @@
-import { Server } from "http";
+export {};
 
 const mockLogger = {
   info: jest.fn(),
@@ -12,24 +12,29 @@ jest.mock("../../utils/logger", () => ({
 }));
 
 const mockServer = {
-  close: jest.fn((callback) => {
+  close: jest.fn((callback?: () => void) => {
     if (callback) callback();
   }),
 };
 
 const mockApp = {
-  listen: jest.fn((port, callback) => {
+  listen: jest.fn((_port: number, callback?: () => void) => {
     if (callback) callback();
     return mockServer;
   }),
-  get: jest.fn(),
-  disable: jest.fn(),
 };
 
-jest.mock("express", () => jest.fn(() => mockApp));
+jest.mock("../../server", () => ({
+  createApp: jest.fn(() => mockApp),
+}));
 
 jest.mock("../../config/environment", () => ({
   config: {
+    nodeEnv: "development",
+    port: 3000,
+    cors: { allowedOrigins: [] },
+  },
+  environment: {
     nodeEnv: "development",
     port: 3000,
   },
@@ -41,12 +46,13 @@ describe("Server Signal Handlers", () => {
 
   beforeEach(() => {
     originalProcessExit = process.exit;
-    process.exit = jest.fn() as any;
+    process.exit = jest.fn() as unknown as typeof process.exit;
 
     originalProcessOn = process.on;
-    process.on = jest.fn() as any;
+    process.on = jest.fn() as unknown as typeof process.on;
 
     jest.clearAllMocks();
+    jest.resetModules();
   });
 
   afterEach(() => {
@@ -54,60 +60,41 @@ describe("Server Signal Handlers", () => {
     process.on = originalProcessOn;
   });
 
-  it("should create signal handlers that log and close server", () => {
-    const server = mockServer as any;
+  it("registers SIGTERM and SIGINT handlers when index loads", () => {
+    require("../../index");
 
-    const sigtermHandler = () => {
-      mockLogger.info("SIGTERM received, shutting down gracefully");
-      server.close(() => {
-        mockLogger.info("Server closed");
-        process.exit(0);
-      });
-    };
+    expect(process.on).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
+    expect(process.on).toHaveBeenCalledWith("SIGINT", expect.any(Function));
+  });
 
-    const sigintHandler = () => {
-      mockLogger.info("SIGINT received, shutting down gracefully");
-      server.close(() => {
-        mockLogger.info("Server closed");
-        process.exit(0);
-      });
-    };
+  it("logs and closes the server on SIGTERM", () => {
+    require("../../index");
 
-    sigtermHandler();
+    const handler = (process.on as jest.Mock).mock.calls.find(
+      (call) => call[0] === "SIGTERM",
+    )?.[1];
+    handler();
+
     expect(mockLogger.info).toHaveBeenCalledWith(
       "SIGTERM received, shutting down gracefully",
     );
     expect(mockServer.close).toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith("Server closed");
     expect(process.exit).toHaveBeenCalledWith(0);
+  });
 
-    jest.clearAllMocks();
+  it("logs and closes the server on SIGINT", () => {
+    require("../../index");
 
-    sigintHandler();
+    const handler = (process.on as jest.Mock).mock.calls.find(
+      (call) => call[0] === "SIGINT",
+    )?.[1];
+    handler();
+
     expect(mockLogger.info).toHaveBeenCalledWith(
       "SIGINT received, shutting down gracefully",
     );
     expect(mockServer.close).toHaveBeenCalled();
     expect(process.exit).toHaveBeenCalledWith(0);
-  });
-
-  it("should handle server startup logging", () => {
-    const port = 3000;
-    const environment = "development";
-
-    const server = mockApp.listen(port, () => {
-      mockLogger.info(`Server started on port ${port}`, {
-        environment: environment,
-        port: port,
-      });
-    });
-
-    expect(mockApp.listen).toHaveBeenCalledWith(port, expect.any(Function));
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      `Server started on port ${port}`,
-      {
-        environment: environment,
-        port: port,
-      },
-    );
   });
 });

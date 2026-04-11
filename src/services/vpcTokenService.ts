@@ -44,24 +44,35 @@ function cacheToken(token: string): void {
   cachedTokenExp = exp ?? now + 3600;
 }
 
+type HeadersLike = { get: (_key: string) => unknown };
+type HeadersRecord = { Authorization?: unknown; authorization?: unknown };
+
+function isHeadersLike(value: unknown): value is HeadersLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "get" in value &&
+    typeof (value as { get?: unknown }).get === "function"
+  );
+}
+
+function readAuthorization(headers: unknown): string | null {
+  if (isHeadersLike(headers)) {
+    const fromGet =
+      headers.get("Authorization") ?? headers.get("authorization");
+    return typeof fromGet === "string" ? fromGet : null;
+  }
+  const record = headers as HeadersRecord;
+  const fromRecord = record.Authorization ?? record.authorization;
+  return typeof fromRecord === "string" ? fromRecord : null;
+}
+
 async function getGcpAuthorizationHeader(audience: string): Promise<string> {
   const auth = new GoogleAuth();
   const client = await auth.getIdTokenClient(audience);
   const headers = (await client.getRequestHeaders(audience)) as unknown;
-  const isHeadersLike =
-    typeof headers === "object" &&
-    headers !== null &&
-    "get" in headers &&
-    typeof (headers as { get?: unknown }).get === "function";
-  const headersWithGet = headers as { get?: unknown };
-  const headerGetter = headersWithGet.get as any;
-  const headerValue = isHeadersLike
-    ? (headerGetter("Authorization") ?? headerGetter("authorization") ?? null)
-    : ((headers as { Authorization?: string; authorization?: string })
-        .Authorization ??
-      (headers as { Authorization?: string; authorization?: string })
-        .authorization);
-  if (!headerValue || typeof headerValue !== "string") {
+  const headerValue = readAuthorization(headers);
+  if (!headerValue) {
     throw new Error("Unable to obtain GCP identity token");
   }
   return headerValue;

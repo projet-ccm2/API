@@ -8,9 +8,8 @@ describe("Server Coverage Tests", () => {
     originalProcessExit = process.exit;
     originalProcessOn = process.on;
 
-    process.exit = jest.fn() as any;
-
-    process.on = jest.fn() as any;
+    process.exit = jest.fn() as unknown as typeof process.exit;
+    process.on = jest.fn() as unknown as typeof process.on;
 
     jest.clearAllMocks();
   });
@@ -23,128 +22,48 @@ describe("Server Coverage Tests", () => {
     jest.resetModules();
   });
 
-  it("should test server startup logic in development environment", () => {
+  it("starts in development mode and registers signal handlers", () => {
     process.env.NODE_ENV = "development";
-    process.env.PORT = "3000";
 
     const mockServer = {
-      close: jest.fn((callback) => {
+      close: jest.fn((callback?: () => void) => {
         if (callback) callback();
       }),
     };
 
     const mockApp = {
-      listen: jest.fn((port, callback) => {
+      listen: jest.fn((_port: number, callback?: () => void) => {
         if (callback) callback();
         return mockServer;
       }),
-      get: jest.fn(),
-      disable: jest.fn(),
     };
 
-    jest.doMock("express", () => jest.fn(() => mockApp));
-
-    const mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    };
+    jest.doMock("../../server", () => ({
+      createApp: jest.fn(() => mockApp),
+    }));
 
     jest.doMock("../../utils/logger", () => ({
-      logger: mockLogger,
+      logger: {
+        info: jest.fn(),
+        error: jest.fn(),
+        warn: jest.fn(),
+        debug: jest.fn(),
+      },
     }));
 
     jest.doMock("../../config/environment", () => ({
       config: {
         nodeEnv: "development",
         port: 3000,
+        cors: { allowedOrigins: [] },
       },
+      environment: { nodeEnv: "development", port: 3000 },
     }));
 
     require("../../index");
 
-    expect(process.env.NODE_ENV).toBe("development");
-  });
-
-  it("should test signal handler registration logic", () => {
-    const mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    };
-
-    const mockServer = {
-      close: jest.fn((callback) => {
-        if (callback) callback();
-      }),
-    };
-
-    const sigtermHandler = () => {
-      mockLogger.info("SIGTERM received, shutting down gracefully");
-      mockServer.close(() => {
-        mockLogger.info("Server closed");
-        process.exit(0);
-      });
-    };
-
-    const sigintHandler = () => {
-      mockLogger.info("SIGINT received, shutting down gracefully");
-      mockServer.close(() => {
-        mockLogger.info("Server closed");
-        process.exit(0);
-      });
-    };
-
-    sigtermHandler();
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      "SIGTERM received, shutting down gracefully",
-    );
-    expect(mockServer.close).toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(0);
-
-    jest.clearAllMocks();
-
-    sigintHandler();
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      "SIGINT received, shutting down gracefully",
-    );
-    expect(mockServer.close).toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(0);
-  });
-
-  it("should test server startup callback logic", () => {
-    const mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    };
-
-    const mockApp = {
-      listen: jest.fn((port, callback) => {
-        if (callback) callback();
-      }),
-    };
-
-    const port = 3000;
-    const environment = "development";
-
-    mockApp.listen(port, () => {
-      mockLogger.info(`Server started on port ${port}`, {
-        environment: environment,
-        port: port,
-      });
-    });
-
-    expect(mockApp.listen).toHaveBeenCalledWith(port, expect.any(Function));
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      `Server started on port ${port}`,
-      {
-        environment: environment,
-        port: port,
-      },
-    );
+    expect(mockApp.listen).toHaveBeenCalledWith(3000, expect.any(Function));
+    expect(process.on).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
+    expect(process.on).toHaveBeenCalledWith("SIGINT", expect.any(Function));
   });
 });

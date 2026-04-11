@@ -58,6 +58,52 @@ describe("achievementController", () => {
     expect(response.status).toHaveBeenCalledWith(400);
   });
 
+  it("returns 400 when body is null", async () => {
+    const request = { body: null } as unknown as Request;
+    const response = createMockResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await verifyAndAttachUser(request, response, next);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+  });
+
+  it("returns 400 when achievement_id has invalid characters", async () => {
+    const request = {
+      body: { twitch_token: "valid", achievement_id: "bad id!" },
+    } as Request;
+    const response = createMockResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await verifyAndAttachUser(request, response, next);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+  });
+
+  it("returns 400 when twitch_token is too long", async () => {
+    const request = {
+      body: { twitch_token: "x".repeat(5000), achievement_id: "a1" },
+    } as Request;
+    const response = createMockResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await verifyAndAttachUser(request, response, next);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+  });
+
+  it("returns 400 when achievement_id is too long", async () => {
+    const request = {
+      body: { twitch_token: "valid", achievement_id: "a".repeat(200) },
+    } as Request;
+    const response = createMockResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await verifyAndAttachUser(request, response, next);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+  });
+
   it("sets res.locals and calls next() on valid token", async () => {
     const request = {
       body: { twitch_token: "valid", achievement_id: "a1" },
@@ -90,17 +136,18 @@ describe("achievementController", () => {
     expect(response.status).toHaveBeenCalledWith(401);
   });
 
-  it("returns 500 when verifyTwitchToken throws unexpected error", async () => {
+  it("forwards unexpected errors from verifyTwitchToken to next()", async () => {
     const request = {
       body: { twitch_token: "tok", achievement_id: "a1" },
     } as Request;
     const response = createMockResponse();
     const next = jest.fn() as unknown as NextFunction;
-    verifyTwitchToken.mockRejectedValue(new Error("unexpected"));
+    const unexpected = new Error("unexpected");
+    verifyTwitchToken.mockRejectedValue(unexpected);
 
     await verifyAndAttachUser(request, response, next);
 
-    expect(response.status).toHaveBeenCalledWith(500);
+    expect(next).toHaveBeenCalledWith(unexpected);
   });
 
   it("returns 200 when achievement is inserted", async () => {
@@ -108,9 +155,10 @@ describe("achievementController", () => {
     const response = createMockResponse();
     response.locals.userId = "u1";
     response.locals.achievementId = "a1";
+    const next = jest.fn() as unknown as NextFunction;
     insertAchieved.mockResolvedValue(undefined);
 
-    await validateAchievement(request, response);
+    await validateAchievement(request, response, next);
 
     expect(response.status).toHaveBeenCalledWith(200);
     expect(response.json).toHaveBeenCalledWith({
@@ -124,9 +172,10 @@ describe("achievementController", () => {
     const response = createMockResponse();
     response.locals.userId = "u1";
     response.locals.achievementId = "a1";
+    const next = jest.fn() as unknown as NextFunction;
     insertAchieved.mockRejectedValue(new AlreadyAchievedError());
 
-    await validateAchievement(request, response);
+    await validateAchievement(request, response, next);
 
     expect(response.status).toHaveBeenCalledWith(409);
   });
@@ -134,21 +183,35 @@ describe("achievementController", () => {
   it("returns 500 when res.locals are missing", async () => {
     const request = {} as Request;
     const response = createMockResponse();
+    const next = jest.fn() as unknown as NextFunction;
 
-    await validateAchievement(request, response);
+    await validateAchievement(request, response, next);
 
     expect(response.status).toHaveBeenCalledWith(500);
   });
 
-  it("returns 500 when insertAchieved throws unexpected error", async () => {
+  it("returns 500 when only userId is present in res.locals", async () => {
+    const request = {} as Request;
+    const response = createMockResponse();
+    response.locals.userId = "u1";
+    const next = jest.fn() as unknown as NextFunction;
+
+    await validateAchievement(request, response, next);
+
+    expect(response.status).toHaveBeenCalledWith(500);
+  });
+
+  it("forwards unexpected errors from insertAchieved to next()", async () => {
     const request = {} as Request;
     const response = createMockResponse();
     response.locals.userId = "u1";
     response.locals.achievementId = "a1";
-    insertAchieved.mockRejectedValue(new Error("db down"));
+    const next = jest.fn() as unknown as NextFunction;
+    const unexpected = new Error("db down");
+    insertAchieved.mockRejectedValue(unexpected);
 
-    await validateAchievement(request, response);
+    await validateAchievement(request, response, next);
 
-    expect(response.status).toHaveBeenCalledWith(500);
+    expect(next).toHaveBeenCalledWith(unexpected);
   });
 });

@@ -1,4 +1,4 @@
-import { Server } from "http";
+export {};
 
 jest.mock("../../utils/logger", () => ({
   logger: {
@@ -13,50 +13,51 @@ jest.mock("../../config/environment", () => ({
   config: {
     nodeEnv: "production",
     port: 3000,
+    cors: { allowedOrigins: [] },
+  },
+  environment: {
+    nodeEnv: "production",
+    port: 3000,
+    rateLimitWindowMs: 60000,
+    rateLimitMax: 30,
   },
 }));
 
+const mockServer = {
+  close: jest.fn((callback?: () => void) => {
+    if (callback) callback();
+  }),
+};
+
+const mockApp = {
+  listen: jest.fn((_port: number, callback?: () => void) => {
+    if (callback) callback();
+    return mockServer;
+  }),
+};
+
+jest.mock("../../server", () => ({
+  createApp: jest.fn(() => mockApp),
+}));
+
 describe("Production Server", () => {
-  let originalEnv: string | undefined;
   let originalProcessExit: typeof process.exit;
   let originalProcessOn: typeof process.on;
-  let mockServer: any;
-  let mockApp: any;
 
   beforeEach(() => {
-    originalEnv = process.env.NODE_ENV;
     originalProcessExit = process.exit;
     originalProcessOn = process.on;
 
-    process.env.NODE_ENV = "production";
-    process.exit = jest.fn() as any;
-    process.on = jest.fn() as any;
-
-    mockServer = {
-      close: jest.fn((callback) => {
-        if (callback) callback();
-      }),
-    };
-
-    mockApp = {
-      listen: jest.fn((port, callback) => {
-        if (callback) callback();
-        return mockServer;
-      }),
-      get: jest.fn(),
-      disable: jest.fn(),
-    };
-
-    jest.doMock("express", () => jest.fn(() => mockApp));
+    process.exit = jest.fn() as unknown as typeof process.exit;
+    process.on = jest.fn() as unknown as typeof process.on;
 
     jest.clearAllMocks();
+    jest.resetModules();
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
     process.exit = originalProcessExit;
     process.on = originalProcessOn;
-    jest.resetModules();
   });
 
   it("should start server in production environment", () => {
@@ -75,11 +76,8 @@ describe("Production Server", () => {
     )?.[1];
 
     expect(sigtermHandler).toBeDefined();
-
-    if (sigtermHandler) {
-      sigtermHandler();
-      expect(mockServer.close).toHaveBeenCalled();
-    }
+    sigtermHandler();
+    expect(mockServer.close).toHaveBeenCalled();
   });
 
   it("should handle SIGINT in production", () => {
@@ -90,10 +88,7 @@ describe("Production Server", () => {
     )?.[1];
 
     expect(sigintHandler).toBeDefined();
-
-    if (sigintHandler) {
-      sigintHandler();
-      expect(mockServer.close).toHaveBeenCalled();
-    }
+    sigintHandler();
+    expect(mockServer.close).toHaveBeenCalled();
   });
 });

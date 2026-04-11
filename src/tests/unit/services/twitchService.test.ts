@@ -2,6 +2,7 @@ import axios from "axios";
 import { environment } from "../../../config/environment";
 import {
   TwitchUnauthorizedError,
+  resetTwitchTokenCache,
   verifyTwitchToken,
 } from "../../../services/twitchService";
 
@@ -12,6 +13,7 @@ describe("verifyTwitchToken", () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    resetTwitchTokenCache();
     environment.twitchClientId = "";
   });
 
@@ -75,6 +77,46 @@ describe("verifyTwitchToken", () => {
     mockedAxios.get.mockRejectedValue(nullResponseError as never);
 
     await expect(verifyTwitchToken("token")).rejects.toBe(nullResponseError);
+  });
+
+  it("returns cached result on second call within TTL", async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: { user_id: "123", login: "streamer", expires_in: 3600 },
+    } as never);
+
+    const first = await verifyTwitchToken("token");
+    const second = await verifyTwitchToken("token");
+
+    expect(first).toEqual(second);
+    expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache when expires_in is 0 (TTL becomes zero)", async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: { user_id: "123", login: "streamer", expires_in: 0 },
+    } as never);
+
+    await verifyTwitchToken("token");
+    await verifyTwitchToken("token");
+
+    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-fetches when cached entry has expired", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+
+    mockedAxios.get.mockResolvedValue({
+      data: { user_id: "123", login: "streamer", expires_in: 1 },
+    } as never);
+
+    await verifyTwitchToken("token");
+    jest.setSystemTime(new Date("2026-01-01T00:00:05.000Z"));
+    await verifyTwitchToken("token");
+
+    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+
+    jest.useRealTimers();
   });
 
   it("includes Client-Id header when twitchClientId is set", async () => {

@@ -1,17 +1,8 @@
 import { config } from "./config/environment";
-import express from "express";
+import { createApp } from "./server";
 import { logger } from "./utils/logger";
 
-const app = express();
-app.disable("x-powered-by");
-
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    environment: config.nodeEnv,
-  });
-});
+const app = createApp();
 
 if (config.nodeEnv !== "test") {
   const server = app.listen(config.port, () => {
@@ -21,21 +12,16 @@ if (config.nodeEnv !== "test") {
     });
   });
 
-  process.on("SIGTERM", () => {
-    logger.info("SIGTERM received, shutting down gracefully");
+  const shutdown = (signal: string): void => {
+    logger.info(`${signal} received, shutting down gracefully`);
     server.close(() => {
       logger.info("Server closed");
       process.exit(0);
     });
-  });
+  };
 
-  process.on("SIGINT", () => {
-    logger.info("SIGINT received, shutting down gracefully");
-    server.close(() => {
-      logger.info("Server closed");
-      process.exit(0);
-    });
-  });
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 export default app;

@@ -13,6 +13,10 @@ type ValidateRequestBody = {
   achievement_id?: unknown;
 };
 
+const MAX_TOKEN_LENGTH = 4096;
+const MAX_ACHIEVEMENT_ID_LENGTH = 128;
+const ACHIEVEMENT_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 function readBody(body: ValidateRequestBody): {
   twitchToken?: string;
   achievementId?: string;
@@ -26,15 +30,29 @@ function readBody(body: ValidateRequestBody): {
   return { twitchToken, achievementId };
 }
 
+function isValidInput(twitchToken: string, achievementId: string): boolean {
+  if (twitchToken.length > MAX_TOKEN_LENGTH) {
+    return false;
+  }
+  if (achievementId.length > MAX_ACHIEVEMENT_ID_LENGTH) {
+    return false;
+  }
+  return ACHIEVEMENT_ID_PATTERN.test(achievementId);
+}
+
 export async function verifyAndAttachUser(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const payload = req.body as ValidateRequestBody;
+  const payload = (req.body ?? {}) as ValidateRequestBody;
   const { twitchToken, achievementId } = readBody(payload);
 
-  if (!twitchToken || !achievementId) {
+  if (
+    !twitchToken ||
+    !achievementId ||
+    !isValidInput(twitchToken, achievementId)
+  ) {
     res
       .status(400)
       .json({ error: "twitch_token and achievement_id are required" });
@@ -53,33 +71,31 @@ export async function verifyAndAttachUser(
       res.status(401).json({ error: "Invalid or expired Twitch token" });
       return;
     }
-    res.status(500).json({ error: "Internal server error" });
-    return;
+    next(error);
   }
 }
 
 export async function validateAchievement(
   _req: Request,
   res: Response,
+  next: NextFunction,
 ): Promise<void> {
-  try {
-    const userId = res.locals.userId as string | undefined;
-    const achievementId = res.locals.achievementId as string | undefined;
-    if (!userId || !achievementId) {
-      res.status(500).json({ error: "Internal server error" });
-      return;
-    }
+  const userId = res.locals.userId as string | undefined;
+  const achievementId = res.locals.achievementId as string | undefined;
+  if (!userId || !achievementId) {
+    res.status(500).json({ error: "Internal server error" });
+    return;
+  }
 
-    const achievedPayload = {
+  try {
+    await insertAchieved({
       achievementId,
       userId,
       count: 1,
       finished: true,
       labelActive: true,
       acquiredDate: new Date().toISOString(),
-    };
-
-    await insertAchieved(achievedPayload);
+    });
     res.status(200).json({ success: true, user_id: userId });
   } catch (error: unknown) {
     if (error instanceof AlreadyAchievedError) {
@@ -88,6 +104,6 @@ export async function validateAchievement(
         .json({ error: "Achievement already validated for this user" });
       return;
     }
-    res.status(500).json({ error: "Internal server error" });
+    next(error);
   }
 }

@@ -130,9 +130,21 @@ Simple health check endpoint.
 
 ## Security
 
-- Twitch token validation through `GET /oauth2/validate`
-- Per-user rate limiting (`user_id` key)
-- Basic security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`)
+- Twitch token validation through `GET /oauth2/validate`, with an in-memory
+  TTL cache (capped at 5 minutes) keyed by SHA-256 of the token to limit
+  upstream load while still respecting `expires_in`.
+- Per-user rate limiting (`user_id` key) with lazy cleanup of stale entries to
+  prevent unbounded memory growth.
+- Strict input validation: `twitch_token` capped at 4096 chars,
+  `achievement_id` capped at 128 chars and restricted to `[A-Za-z0-9_-]`.
+- JSON body size limited to 16 KB.
+- Basic security headers (`X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy`).
+- CORS allow-list driven by `ALLOWED_ORIGINS` (or sensible local defaults).
+- Every request gets an `X-Request-Id` (echoed back to the caller and used in
+  structured logs) and is logged once with method/path/status/duration.
+- Centralized error middleware logs unhandled exceptions with the request id
+  and returns a generic 500 (no internal details leak).
 
 ## VPC Access (Bastion architecture)
 
@@ -161,7 +173,9 @@ src/
 ├── controllers/
 │   └── achievementController.ts  # Request validation + Twitch + DB orchestration
 ├── middlewares/
-│   └── rateLimitMiddleware.ts    # In-memory rate limit by user_id
+│   ├── errorMiddleware.ts        # Centralized error handler
+│   ├── rateLimitMiddleware.ts    # In-memory rate limit by user_id
+│   └── requestContextMiddleware.ts # Request id + structured request logging
 ├── routes/
 │   └── achievementRoutes.ts      # POST /achievements/validate
 ├── services/

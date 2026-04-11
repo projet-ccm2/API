@@ -24,7 +24,10 @@ export default [
       jsdoc: jsdocPlugin,
     },
     rules: {
-      "no-unused-vars": "warn",
+      "no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
       "no-undef": "warn",
       camelcase: ["error", { properties: "never" }],
       "prettier/prettier": "error",
@@ -41,6 +44,11 @@ export default [
         it: "readonly",
         expect: "readonly",
         beforeEach: "readonly",
+        afterEach: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
+        require: "readonly",
+        global: "readonly",
       },
     },
   },
