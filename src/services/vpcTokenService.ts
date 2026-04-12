@@ -19,8 +19,8 @@ function parseJwtExp(token: string): number | null {
   }
 
   try {
-    const payloadPart = parts[1] as string;
-    const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const payloadPart = parts[1];
+    const base64 = payloadPart.replaceAll("-", "+").replaceAll("_", "/");
     const json = Buffer.from(base64, "base64").toString("utf8");
     const parsed = JSON.parse(json) as { exp?: unknown };
     return typeof parsed.exp === "number" ? parsed.exp : null;

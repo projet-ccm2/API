@@ -80,6 +80,7 @@ export async function validateAchievement(
     };
 
     await insertAchieved(achievedPayload);
+    // eslint-disable-next-line camelcase
     res.status(200).json({ success: true, user_id: userId });
   } catch (error: unknown) {
     if (error instanceof AlreadyAchievedError) {

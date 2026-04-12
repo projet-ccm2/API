@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { NextFunction, Request, Response } from "express";
 import {
   validateAchievement,

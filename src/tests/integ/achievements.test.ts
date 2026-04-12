@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import request from "supertest";
 import { createApp } from "../../server";
 import { resetRateLimiter } from "../../middlewares/rateLimitMiddleware";

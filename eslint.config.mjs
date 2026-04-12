@@ -26,7 +26,7 @@ export default [
     rules: {
       "no-unused-vars": "warn",
       "no-undef": "warn",
-      camelcase: ["error", { properties: "never" }],
+      camelcase: ["error", { properties: "always" }],
       "prettier/prettier": "error",
       "jsdoc/check-tag-names": "error",
       "jsdoc/require-description": "error",

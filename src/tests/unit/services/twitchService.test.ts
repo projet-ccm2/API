@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import axios from "axios";
 import { environment } from "../../../config/environment";
 import {
