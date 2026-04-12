@@ -72,6 +72,22 @@ describe("Environment Configuration", () => {
     });
   });
 
+  describe("environment export", () => {
+    it("uses provided env vars when set", () => {
+      process.env.DB_GATEWAY_BASE_URL = "http://custom-db:5000";
+      process.env.AUTH_SERVICE_URL = "http://custom-auth:4000";
+      process.env.TWITCH_API_URL = "https://custom.twitch.tv/oauth2";
+      process.env.TWITCH_CLIENT_ID = "my-client-id";
+
+      const { environment } = require("../../../config/environment");
+
+      expect(environment.dbGatewayUrl).toBe("http://custom-db:5000");
+      expect(environment.authServiceUrl).toBe("http://custom-auth:4000");
+      expect(environment.twitchApiUrl).toBe("https://custom.twitch.tv/oauth2");
+      expect(environment.twitchClientId).toBe("my-client-id");
+    });
+  });
+
   describe("config structure", () => {
     it("should have correct structure", () => {
       const { config } = require("../../../config/environment");

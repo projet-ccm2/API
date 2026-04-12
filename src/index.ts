@@ -1,11 +1,11 @@
-import express from "express";
 import { config } from "./config/environment";
+import express from "express";
 import { logger } from "./utils/logger";
 
 const app = express();
 app.disable("x-powered-by");
 
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.status(200).json({
     status: "healthy",
     timestamp: new Date().toISOString(),

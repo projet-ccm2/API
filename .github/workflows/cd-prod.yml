@@ -9,6 +9,7 @@ on:
         description: "Version to deploy (e.g., v1.2.3)"
         required: true
         type: string
+        default: ""
 
 jobs:
   deploy-prod:
@@ -17,12 +18,17 @@ jobs:
     if: github.event_name != 'pull_request'
     with:
       docker-image-name: api-api-prod
-      docker-tag: ${{ github.event.inputs.image-tag || format('dev-{0}', github.sha) }}
+      docker-tag: ${{ github.event.inputs.version || github.ref_name || format('prod-{0}', github.sha) }}
       artifact-registry-repository: "api-docker-prod"
       environment: production
       cloud-run-service-name: api-prod
+      service_type: back_prive
+      required_env_vars: AUTH_SERVICE_URL,JWT_SECRET,TWITCH_CLIENT_ID,DB_GATEWAY_BASE_URL
 
     secrets:
       GCP_SA_KEY: ${{ secrets.PROD_GCP_SA_KEY }}
       GCP_PROJECT_ID: ${{ secrets.PROD_GCP_PROJECT_ID }}
+      AUTH_SERVICE_URL: ${{ secrets.AUTH_SERVICE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      DB_GATEWAY_BASE_URL: ${{ secrets.DB_GATEWAY_BASE_URL }}
       TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
