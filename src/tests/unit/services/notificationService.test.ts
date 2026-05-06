@@ -122,7 +122,12 @@ describe("notificationService", () => {
     });
 
     it("logs warn and skips Twitch call when channelLogin is empty", async () => {
-      await notifyAchievementUnlocked("streamer", "Achievement X", "", discordChannelId);
+      await notifyAchievementUnlocked(
+        "streamer",
+        "Achievement X",
+        "",
+        discordChannelId,
+      );
 
       expect(mockedLogger.warn).toHaveBeenCalledWith(
         "Skipping Twitch notification: channelLogin is empty",
@@ -211,7 +216,12 @@ describe("notificationService", () => {
     it("logs warn and skips Discord call when discordChannelId is empty", async () => {
       mockedAxios.post.mockResolvedValue({ status: 200 });
 
-      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin, "");
+      await notifyAchievementUnlocked(
+        "streamer",
+        "Achievement X",
+        channelLogin,
+        "",
+      );
 
       expect(mockedLogger.warn).toHaveBeenCalledWith(
         "Skipping Discord notification: discordChannelId is empty",

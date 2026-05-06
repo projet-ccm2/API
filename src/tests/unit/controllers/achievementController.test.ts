@@ -25,7 +25,12 @@ jest.mock("../../../services/notificationService", () => ({
 }));
 
 jest.mock("../../../utils/logger", () => ({
-  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+  logger: {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  },
 }));
 
 const { verifyTwitchToken } = jest.requireMock(

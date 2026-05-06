@@ -104,7 +104,7 @@ export async function validateAchievement(
       } catch (err: unknown) {
         logger.warn(
           "Could not fetch achievement details, skipping notifications",
-          { context: "db-gateway", achievementId },
+          { context: "db-gateway", achievementId, error: String(err) },
         );
       }
     }

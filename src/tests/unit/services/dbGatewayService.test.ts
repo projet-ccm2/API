@@ -106,7 +106,9 @@ describe("dbGatewayService", () => {
   describe("isAchievementAlreadyValidated", () => {
     it("returns true when GET /achieved returns 200", async () => {
       mockedBuildHeaders.mockResolvedValue({ Authorization: "Bearer tok" });
-      mockedAxios.get.mockResolvedValue({ data: { achievementId: "ach-1", userId: "u-1" } } as never);
+      mockedAxios.get.mockResolvedValue({
+        data: { achievementId: "ach-1", userId: "u-1" },
+      } as never);
 
       const result = await isAchievementAlreadyValidated("ach-1", "u-1");
 
@@ -135,9 +137,9 @@ describe("dbGatewayService", () => {
       const serverError = { response: { status: 500 } };
       mockedAxios.get.mockRejectedValue(serverError as never);
 
-      await expect(
-        isAchievementAlreadyValidated("ach-1", "u-1"),
-      ).rejects.toBe(serverError);
+      await expect(isAchievementAlreadyValidated("ach-1", "u-1")).rejects.toBe(
+        serverError,
+      );
     });
   });
 
@@ -168,6 +170,22 @@ describe("dbGatewayService", () => {
         title: "Premier sang",
         channelLogin: "broadcaster",
         discordChannelId: "ch-1",
+      });
+    });
+
+    it("returns empty channelLogin and discordChannelId when channelId is not a string", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      mockedAxios.get.mockResolvedValueOnce({
+        data: { title: "Premier sang", channelId: 123 },
+      } as never);
+
+      const result = await getAchievementById("ach-1");
+
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({
+        title: "Premier sang",
+        channelLogin: "",
+        discordChannelId: "",
       });
     });
 

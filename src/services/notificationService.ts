@@ -21,7 +21,9 @@ async function sendTwitchNotification(
     {
       headers: {
         "Content-Type": "application/json",
-        ...(environment.chatApiKey ? { "x-api-key": environment.chatApiKey } : {}),
+        ...(environment.chatApiKey
+          ? { "x-api-key": environment.chatApiKey }
+          : {}),
       },
       timeout: 8_000,
     },
@@ -92,13 +94,15 @@ export async function notifyAchievementUnlocked(
         });
       },
     ),
-    sendDiscordNotification(userLogin, achievementTitle, discordChannelId).catch(
-      (err: unknown) => {
-        logger.error("Discord notification error", {
-          context: "discord",
-          error: String(err),
-        });
-      },
-    ),
+    sendDiscordNotification(
+      userLogin,
+      achievementTitle,
+      discordChannelId,
+    ).catch((err: unknown) => {
+      logger.error("Discord notification error", {
+        context: "discord",
+        error: String(err),
+      });
+    }),
   ]);
 }

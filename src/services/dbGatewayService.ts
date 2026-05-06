@@ -54,24 +54,26 @@ export async function getAchievementById(
   const achievement = achievementRes.data;
   logger.debug("Achievement fetched", { achievementId, data: achievement });
 
-  const title = String(achievement["title"] ?? "");
+  const rawTitle = achievement["title"];
+  const title = typeof rawTitle === "string" ? rawTitle : "";
   const channelId = achievement["channelId"];
 
-  if (!channelId) {
+  if (!channelId || typeof channelId !== "string") {
     return { title, channelLogin: "", discordChannelId: "" };
   }
 
   const channelRes = await axios.get<Record<string, unknown>>(
-    `${environment.dbGatewayUrl}/channels/${String(channelId)}`,
+    `${environment.dbGatewayUrl}/channels/${channelId}`,
     { headers, timeout: 8_000 },
   );
   const channel = channelRes.data;
   logger.debug("Channel fetched", { channelId, data: channel });
 
+  const rawName = channel["name"];
   return {
     title,
-    channelLogin: String(channel["name"] ?? ""),
-    discordChannelId: String(channelId),
+    channelLogin: typeof rawName === "string" ? rawName : "",
+    discordChannelId: channelId,
   };
 }
 
