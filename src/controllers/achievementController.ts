@@ -86,22 +86,20 @@ export async function validateAchievement(
     await insertAchieved(achievedPayload);
 
     const login = res.locals.twitchLogin as string;
-    void (async () => {
-      try {
-        const details = await getAchievementById(achievementId);
-        await notifyAchievementUnlocked(
-          login,
-          details.title,
-          details.channelLogin,
-          details.discordChannelId,
-        );
-      } catch (err: unknown) {
-        logger.warn("Could not fetch achievement details, skipping notifications", {
-          context: "db-gateway",
-          achievementId,
-        });
-      }
-    })();
+    try {
+      const details = await getAchievementById(achievementId);
+      await notifyAchievementUnlocked(
+        login,
+        details.title,
+        details.channelLogin,
+        details.discordChannelId,
+      );
+    } catch (err: unknown) {
+      logger.warn("Could not fetch achievement details, skipping notifications", {
+        context: "db-gateway",
+        achievementId,
+      });
+    }
 
     // eslint-disable-next-line camelcase
     res.status(200).json({ success: true, user_id: userId });

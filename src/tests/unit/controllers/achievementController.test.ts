@@ -161,7 +161,6 @@ describe("achievementController", () => {
     });
 
     await validateAchievement(request, response);
-    await new Promise(setImmediate);
 
     expect(getAchievementById).toHaveBeenCalledWith("a1");
     expect(notifyAchievementUnlocked).toHaveBeenCalledWith(
@@ -182,7 +181,6 @@ describe("achievementController", () => {
     getAchievementById.mockRejectedValue(new Error("not found"));
 
     await validateAchievement(request, response);
-    await new Promise(setImmediate);
 
     expect(notifyAchievementUnlocked).not.toHaveBeenCalled();
   });
