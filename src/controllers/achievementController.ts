@@ -56,6 +56,7 @@ export async function verifyAndAttachUser(
       res.status(401).json({ error: "Invalid or expired Twitch token" });
       return;
     }
+    logger.error("Unexpected error in verifyAndAttachUser", { error });
     res.status(500).json({ error: "Internal server error" });
     return;
   }
@@ -111,6 +112,7 @@ export async function validateAchievement(
         .json({ error: "Achievement already validated for this user" });
       return;
     }
+    logger.error("Unexpected error in validateAchievement", { error });
     res.status(500).json({ error: "Internal server error" });
   }
 }

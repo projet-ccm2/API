@@ -6,6 +6,7 @@ import {
 } from "../../../controllers/achievementController";
 import { AlreadyAchievedError } from "../../../services/dbGatewayService";
 import { TwitchUnauthorizedError } from "../../../services/twitchService";
+import { logger } from "../../../utils/logger";
 
 jest.mock("../../../services/twitchService", () => ({
   verifyTwitchToken: jest.fn(),
@@ -20,6 +21,10 @@ jest.mock("../../../services/dbGatewayService", () => ({
 
 jest.mock("../../../services/notificationService", () => ({
   notifyAchievementUnlocked: jest.fn(),
+}));
+
+jest.mock("../../../utils/logger", () => ({
+  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
 
 const { verifyTwitchToken } = jest.requireMock(
@@ -108,7 +113,7 @@ describe("achievementController", () => {
     expect(response.status).toHaveBeenCalledWith(401);
   });
 
-  it("returns 500 when verifyTwitchToken throws unexpected error", async () => {
+  it("returns 500 and logs error when verifyTwitchToken throws unexpected error", async () => {
     const request = {
       body: { twitch_token: "tok", achievement_id: "a1" },
     } as Request;
@@ -119,6 +124,10 @@ describe("achievementController", () => {
     await verifyAndAttachUser(request, response, next);
 
     expect(response.status).toHaveBeenCalledWith(500);
+    expect(logger.error).toHaveBeenCalledWith(
+      "Unexpected error in verifyAndAttachUser",
+      expect.any(Object),
+    );
   });
 
   it("returns 200 when achievement is inserted", async () => {
@@ -199,7 +208,7 @@ describe("achievementController", () => {
     expect(response.status).toHaveBeenCalledWith(500);
   });
 
-  it("returns 500 when insertAchieved throws unexpected error", async () => {
+  it("returns 500 and logs error when insertAchieved throws unexpected error", async () => {
     const request = {} as Request;
     const response = createMockResponse();
     response.locals.userId = "u1";
@@ -209,5 +218,9 @@ describe("achievementController", () => {
     await validateAchievement(request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
+    expect(logger.error).toHaveBeenCalledWith(
+      "Unexpected error in validateAchievement",
+      expect.any(Object),
+    );
   });
 });
