@@ -92,7 +92,6 @@ export async function validateAchievement(
         login,
         details.title,
         details.channelLogin,
-        details.discordChannelId,
       );
     } catch (err: unknown) {
       logger.warn("Could not fetch achievement details, skipping notifications", {

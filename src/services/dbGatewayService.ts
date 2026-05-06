@@ -1,5 +1,6 @@
 import axios from "axios";
 import { environment } from "../config/environment";
+import { logger } from "../utils/logger";
 import { buildDbGatewayHeaders } from "./vpcTokenService";
 
 type AchievedPayload = {
@@ -34,7 +35,6 @@ function getStatus(error: unknown): number | undefined {
 export type AchievementDetails = {
   title: string;
   channelLogin: string;
-  discordChannelId: string;
 };
 
 /**
@@ -44,11 +44,16 @@ export async function getAchievementById(
   achievementId: string,
 ): Promise<AchievementDetails> {
   const headers = await buildDbGatewayHeaders();
-  const response = await axios.get<AchievementDetails>(
+  const response = await axios.get<Record<string, unknown>>(
     `${environment.dbGatewayUrl}/achievements/${achievementId}`,
     { headers, timeout: 8_000 },
   );
-  return response.data;
+  const data = response.data;
+  logger.debug("Achievement details fetched", { achievementId, data });
+  return {
+    title: String(data["title"] ?? ""),
+    channelLogin: String(data["channelLogin"] ?? data["channel_login"] ?? ""),
+  };
 }
 
 export async function insertAchieved(payload: AchievedPayload): Promise<void> {

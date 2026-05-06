@@ -18,7 +18,6 @@ describe("notificationService", () => {
   const mockedLogger = logger as jest.Mocked<typeof logger>;
 
   const channelLogin = "streamer-channel";
-  const discordChannelId = "discord-123";
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -31,12 +30,7 @@ describe("notificationService", () => {
     it("calls /chat/message with correct body, channelLogin and x-api-key header", async () => {
       mockedAxios.post.mockResolvedValue({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Premier sang",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Premier sang", channelLogin);
 
       expect(mockedAxios.post).toHaveBeenCalledWith(
         "http://twitch-listener/chat/message",
@@ -58,12 +52,7 @@ describe("notificationService", () => {
       environment.chatApiKey = "";
       mockedAxios.post.mockResolvedValue({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       const [, , twitchConfig] = mockedAxios.post.mock.calls[0];
       expect(
@@ -75,12 +64,7 @@ describe("notificationService", () => {
       mockedAxios.post.mockResolvedValueOnce({ status: 503 });
       mockedAxios.post.mockResolvedValueOnce({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       expect(mockedLogger.warn).toHaveBeenCalledWith(
         "Twitch notification failed",
@@ -91,12 +75,7 @@ describe("notificationService", () => {
     it("logs debug when Twitch returns 2xx status", async () => {
       mockedAxios.post.mockResolvedValue({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       expect(mockedLogger.debug).toHaveBeenCalledWith(
         "Twitch notification sent",
@@ -108,35 +87,39 @@ describe("notificationService", () => {
       mockedAxios.post.mockRejectedValueOnce(new Error("Network error"));
       mockedAxios.post.mockResolvedValueOnce({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       expect(mockedLogger.error).toHaveBeenCalledWith(
         "Twitch notification error",
         expect.objectContaining({ context: "twitch" }),
       );
     });
+
+    it("logs warn and skips Twitch call when channelLogin is empty", async () => {
+      await notifyAchievementUnlocked("streamer", "Achievement X", "");
+
+      expect(mockedLogger.warn).toHaveBeenCalledWith(
+        "Skipping Twitch notification: channelLogin is empty",
+        expect.objectContaining({ context: "twitch" }),
+      );
+      expect(mockedAxios.post).not.toHaveBeenCalledWith(
+        expect.stringContaining("/chat/message"),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
   });
 
   describe("sendDiscordNotification (via notifyAchievementUnlocked)", () => {
-    it("calls /notify with correct body and discordChannelId", async () => {
+    it("calls /notify with channelLogin as channelId", async () => {
       mockedAxios.post.mockResolvedValue({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Premier sang",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Premier sang", channelLogin);
 
       expect(mockedAxios.post).toHaveBeenCalledWith(
         "http://discord-notif/notify",
         {
-          channelId: "discord-123",
+          channelId: "streamer-channel",
           title: "Achievement débloqué",
           text: '@streamer a débloqué l\'achievement "Premier sang" !',
         },
@@ -148,12 +131,7 @@ describe("notificationService", () => {
       mockedAxios.post.mockResolvedValueOnce({ status: 200 });
       mockedAxios.post.mockResolvedValueOnce({ status: 500 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       expect(mockedLogger.warn).toHaveBeenCalledWith(
         "Discord notification failed",
@@ -164,12 +142,7 @@ describe("notificationService", () => {
     it("logs debug when Discord returns 2xx status", async () => {
       mockedAxios.post.mockResolvedValue({ status: 200 });
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       expect(mockedLogger.debug).toHaveBeenCalledWith(
         "Discord notification sent",
@@ -181,16 +154,25 @@ describe("notificationService", () => {
       mockedAxios.post.mockResolvedValueOnce({ status: 200 });
       mockedAxios.post.mockRejectedValueOnce(new Error("Network error"));
 
-      await notifyAchievementUnlocked(
-        "streamer",
-        "Achievement X",
-        channelLogin,
-        discordChannelId,
-      );
+      await notifyAchievementUnlocked("streamer", "Achievement X", channelLogin);
 
       expect(mockedLogger.error).toHaveBeenCalledWith(
         "Discord notification error",
         expect.objectContaining({ context: "discord" }),
+      );
+    });
+
+    it("logs warn and skips Discord call when channelLogin is empty", async () => {
+      await notifyAchievementUnlocked("streamer", "Achievement X", "");
+
+      expect(mockedLogger.warn).toHaveBeenCalledWith(
+        "Skipping Discord notification: channelLogin is empty",
+        expect.objectContaining({ context: "discord" }),
+      );
+      expect(mockedAxios.post).not.toHaveBeenCalledWith(
+        expect.stringContaining("/notify"),
+        expect.anything(),
+        expect.anything(),
       );
     });
   });
@@ -200,12 +182,7 @@ describe("notificationService", () => {
       mockedAxios.post.mockRejectedValue(new Error("all down"));
 
       await expect(
-        notifyAchievementUnlocked(
-          "streamer",
-          "Achievement X",
-          channelLogin,
-          discordChannelId,
-        ),
+        notifyAchievementUnlocked("streamer", "Achievement X", channelLogin),
       ).resolves.toBeUndefined();
 
       expect(mockedLogger.error).toHaveBeenCalledTimes(2);

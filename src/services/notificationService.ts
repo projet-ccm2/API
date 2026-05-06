@@ -7,6 +7,12 @@ async function sendTwitchNotification(
   achievementTitle: string,
   channelLogin: string,
 ): Promise<void> {
+  if (!channelLogin) {
+    logger.warn("Skipping Twitch notification: channelLogin is empty", {
+      context: "twitch",
+    });
+    return;
+  }
   const url = `${environment.twitchListenerUrl}/chat/message`;
   const message = `@${userLogin} a débloqué l'achievement "${achievementTitle}" !`;
   const response = await axios.post(
@@ -36,13 +42,19 @@ async function sendTwitchNotification(
 async function sendDiscordNotification(
   userLogin: string,
   achievementTitle: string,
-  discordChannelId: string,
+  channelLogin: string,
 ): Promise<void> {
+  if (!channelLogin) {
+    logger.warn("Skipping Discord notification: channelLogin is empty", {
+      context: "discord",
+    });
+    return;
+  }
   const url = `${environment.discordNotifUrl}/notify`;
   const response = await axios.post(
     url,
     {
-      channelId: discordChannelId,
+      channelId: channelLogin,
       title: "Achievement débloqué",
       text: `@${userLogin} a débloqué l'achievement "${achievementTitle}" !`,
     },
@@ -69,7 +81,6 @@ export async function notifyAchievementUnlocked(
   userLogin: string,
   achievementTitle: string,
   channelLogin: string,
-  discordChannelId: string,
 ): Promise<void> {
   await Promise.allSettled([
     sendTwitchNotification(userLogin, achievementTitle, channelLogin).catch(
@@ -80,7 +91,7 @@ export async function notifyAchievementUnlocked(
         });
       },
     ),
-    sendDiscordNotification(userLogin, achievementTitle, discordChannelId).catch(
+    sendDiscordNotification(userLogin, achievementTitle, channelLogin).catch(
       (err: unknown) => {
         logger.error("Discord notification error", {
           context: "discord",

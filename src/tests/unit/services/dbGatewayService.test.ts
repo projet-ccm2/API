@@ -11,6 +11,9 @@ jest.mock("axios");
 jest.mock("../../../services/vpcTokenService", () => ({
   buildDbGatewayHeaders: jest.fn(),
 }));
+jest.mock("../../../utils/logger", () => ({
+  logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
 
 describe("dbGatewayService", () => {
   const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -106,7 +109,6 @@ describe("dbGatewayService", () => {
         data: {
           title: "Premier sang",
           channelLogin: "broadcaster",
-          discordChannelId: "disc-123",
         },
       } as never);
 
@@ -119,8 +121,27 @@ describe("dbGatewayService", () => {
       expect(result).toEqual({
         title: "Premier sang",
         channelLogin: "broadcaster",
-        discordChannelId: "disc-123",
       });
+    });
+
+    it("maps snake_case channel_login to channelLogin", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      mockedAxios.get.mockResolvedValue({
+        data: { title: "Premier sang", channel_login: "broadcaster" },
+      } as never);
+
+      const result = await getAchievementById("ach-1");
+
+      expect(result).toEqual({ title: "Premier sang", channelLogin: "broadcaster" });
+    });
+
+    it("returns empty strings when achievement fields are missing", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      mockedAxios.get.mockResolvedValue({ data: {} } as never);
+
+      const result = await getAchievementById("ach-1");
+
+      expect(result).toEqual({ title: "", channelLogin: "" });
     });
 
     it("rethrows when axios throws (caller handles fallback)", async () => {

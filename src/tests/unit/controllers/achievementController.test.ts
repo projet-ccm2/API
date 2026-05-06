@@ -66,7 +66,6 @@ describe("achievementController", () => {
     getAchievementById.mockResolvedValue({
       title: "Achievement X",
       channelLogin: "broadcaster",
-      discordChannelId: "disc-123",
     });
     notifyAchievementUnlocked.mockResolvedValue(undefined);
   });
@@ -157,7 +156,6 @@ describe("achievementController", () => {
     getAchievementById.mockResolvedValue({
       title: "Premier sang",
       channelLogin: "broadcaster",
-      discordChannelId: "disc-123",
     });
 
     await validateAchievement(request, response);
@@ -167,7 +165,6 @@ describe("achievementController", () => {
       "streamer",
       "Premier sang",
       "broadcaster",
-      "disc-123",
     );
   });
 
