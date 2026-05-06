@@ -1,12 +1,15 @@
 import { NextFunction, Request, Response } from "express";
 import {
   AlreadyAchievedError,
+  getAchievementById,
   insertAchieved,
 } from "../services/dbGatewayService";
+import { notifyAchievementUnlocked } from "../services/notificationService";
 import {
   TwitchUnauthorizedError,
   verifyTwitchToken,
 } from "../services/twitchService";
+import { logger } from "../utils/logger";
 
 type ValidateRequestBody = {
   twitch_token?: unknown;
@@ -80,6 +83,25 @@ export async function validateAchievement(
     };
 
     await insertAchieved(achievedPayload);
+
+    const login = res.locals.twitchLogin as string;
+    void (async () => {
+      try {
+        const details = await getAchievementById(achievementId);
+        await notifyAchievementUnlocked(
+          login,
+          details.title,
+          details.channelLogin,
+          details.discordChannelId,
+        );
+      } catch (err: unknown) {
+        logger.warn("Could not fetch achievement details, skipping notifications", {
+          context: "db-gateway",
+          achievementId,
+        });
+      }
+    })();
+
     // eslint-disable-next-line camelcase
     res.status(200).json({ success: true, user_id: userId });
   } catch (error: unknown) {

@@ -47,7 +47,9 @@ describe("Production Server", () => {
       disable: jest.fn(),
     };
 
-    jest.doMock("express", () => jest.fn(() => mockApp));
+    jest.doMock("../../server", () => ({
+      createApp: jest.fn(() => mockApp),
+    }));
 
     jest.clearAllMocks();
   });

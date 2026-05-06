@@ -30,6 +30,9 @@ type RequiredEnvironment = {
   port: number;
   rateLimitWindowMs: number;
   rateLimitMax: number;
+  twitchListenerUrl: string;
+  chatApiKey: string;
+  discordNotifUrl: string;
 };
 
 function parseNumber(value: string | undefined, fallback: number): number {
@@ -46,6 +49,9 @@ export const environment: RequiredEnvironment = {
   port: parseNumber(process.env.PORT, 3000),
   rateLimitWindowMs: parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
   rateLimitMax: parseNumber(process.env.RATE_LIMIT_MAX, 30),
+  twitchListenerUrl: process.env.TWITCH_LISTENER_URL ?? "http://localhost:3002",
+  chatApiKey: process.env.CHAT_API_KEY ?? "",
+  discordNotifUrl: process.env.DISCORD_NOTIF_URL ?? "http://localhost:3003",
 };
 
 export const config = validateConfig();

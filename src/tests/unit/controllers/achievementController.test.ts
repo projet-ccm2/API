@@ -14,7 +14,12 @@ jest.mock("../../../services/twitchService", () => ({
 
 jest.mock("../../../services/dbGatewayService", () => ({
   insertAchieved: jest.fn(),
+  getAchievementById: jest.fn(),
   AlreadyAchievedError: class AlreadyAchievedError extends Error {},
+}));
+
+jest.mock("../../../services/notificationService", () => ({
+  notifyAchievementUnlocked: jest.fn(),
 }));
 
 const { verifyTwitchToken } = jest.requireMock(
@@ -22,10 +27,16 @@ const { verifyTwitchToken } = jest.requireMock(
 ) as {
   verifyTwitchToken: jest.Mock;
 };
-const { insertAchieved } = jest.requireMock(
+const { insertAchieved, getAchievementById } = jest.requireMock(
   "../../../services/dbGatewayService",
 ) as {
   insertAchieved: jest.Mock;
+  getAchievementById: jest.Mock;
+};
+const { notifyAchievementUnlocked } = jest.requireMock(
+  "../../../services/notificationService",
+) as {
+  notifyAchievementUnlocked: jest.Mock;
 };
 
 type MockResponse = Response & {
@@ -47,6 +58,12 @@ function createMockResponse(): MockResponse {
 describe("achievementController", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    getAchievementById.mockResolvedValue({
+      title: "Achievement X",
+      channelLogin: "broadcaster",
+      discordChannelId: "disc-123",
+    });
+    notifyAchievementUnlocked.mockResolvedValue(undefined);
   });
 
   it("returns 400 when body is missing fields", async () => {
@@ -109,6 +126,7 @@ describe("achievementController", () => {
     const response = createMockResponse();
     response.locals.userId = "u1";
     response.locals.achievementId = "a1";
+    response.locals.twitchLogin = "streamer";
     insertAchieved.mockResolvedValue(undefined);
 
     await validateAchievement(request, response);
@@ -118,6 +136,46 @@ describe("achievementController", () => {
       success: true,
       user_id: "u1",
     });
+  });
+
+  it("triggers notification with fetched achievement details on success", async () => {
+    const request = {} as Request;
+    const response = createMockResponse();
+    response.locals.userId = "u1";
+    response.locals.achievementId = "a1";
+    response.locals.twitchLogin = "streamer";
+    insertAchieved.mockResolvedValue(undefined);
+    getAchievementById.mockResolvedValue({
+      title: "Premier sang",
+      channelLogin: "broadcaster",
+      discordChannelId: "disc-123",
+    });
+
+    await validateAchievement(request, response);
+    await new Promise(setImmediate);
+
+    expect(getAchievementById).toHaveBeenCalledWith("a1");
+    expect(notifyAchievementUnlocked).toHaveBeenCalledWith(
+      "streamer",
+      "Premier sang",
+      "broadcaster",
+      "disc-123",
+    );
+  });
+
+  it("skips notification when getAchievementById throws", async () => {
+    const request = {} as Request;
+    const response = createMockResponse();
+    response.locals.userId = "u1";
+    response.locals.achievementId = "a1";
+    response.locals.twitchLogin = "streamer";
+    insertAchieved.mockResolvedValue(undefined);
+    getAchievementById.mockRejectedValue(new Error("not found"));
+
+    await validateAchievement(request, response);
+    await new Promise(setImmediate);
+
+    expect(notifyAchievementUnlocked).not.toHaveBeenCalled();
   });
 
   it("returns 409 when achievement already exists", async () => {

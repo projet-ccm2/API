@@ -42,7 +42,9 @@ describe("Server Coverage Tests", () => {
       disable: jest.fn(),
     };
 
-    jest.doMock("express", () => jest.fn(() => mockApp));
+    jest.doMock("../../server", () => ({
+      createApp: jest.fn(() => mockApp),
+    }));
 
     const mockLogger = {
       info: jest.fn(),

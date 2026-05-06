@@ -31,6 +31,26 @@ function getStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+export type AchievementDetails = {
+  title: string;
+  channelLogin: string;
+  discordChannelId: string;
+};
+
+/**
+ * Fetches achievement details from the DB gateway.
+ */
+export async function getAchievementById(
+  achievementId: string,
+): Promise<AchievementDetails> {
+  const headers = await buildDbGatewayHeaders();
+  const response = await axios.get<AchievementDetails>(
+    `${environment.dbGatewayUrl}/achievements/${achievementId}`,
+    { headers, timeout: 8_000 },
+  );
+  return response.data;
+}
+
 export async function insertAchieved(payload: AchievedPayload): Promise<void> {
   try {
     const headers = await buildDbGatewayHeaders();

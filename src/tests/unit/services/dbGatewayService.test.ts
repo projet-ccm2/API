@@ -2,6 +2,7 @@ import axios from "axios";
 import { environment } from "../../../config/environment";
 import {
   AlreadyAchievedError,
+  getAchievementById,
   insertAchieved,
 } from "../../../services/dbGatewayService";
 import { buildDbGatewayHeaders } from "../../../services/vpcTokenService";
@@ -95,6 +96,39 @@ describe("dbGatewayService", () => {
       mockedAxios.post.mockRejectedValue(badError as never);
 
       await expect(insertAchieved(validPayload)).rejects.toBe(badError);
+    });
+  });
+
+  describe("getAchievementById", () => {
+    it("calls GET /achievements/:id with correct headers and timeout and returns data", async () => {
+      mockedBuildHeaders.mockResolvedValue({ Authorization: "Bearer tok" });
+      mockedAxios.get.mockResolvedValue({
+        data: {
+          title: "Premier sang",
+          channelLogin: "broadcaster",
+          discordChannelId: "disc-123",
+        },
+      } as never);
+
+      const result = await getAchievementById("ach-1");
+
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        "http://localhost:3001/achievements/ach-1",
+        { headers: { Authorization: "Bearer tok" }, timeout: 8_000 },
+      );
+      expect(result).toEqual({
+        title: "Premier sang",
+        channelLogin: "broadcaster",
+        discordChannelId: "disc-123",
+      });
+    });
+
+    it("rethrows when axios throws (caller handles fallback)", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      const networkError = new Error("Network Error");
+      mockedAxios.get.mockRejectedValue(networkError as never);
+
+      await expect(getAchievementById("ach-1")).rejects.toBe(networkError);
     });
   });
 });

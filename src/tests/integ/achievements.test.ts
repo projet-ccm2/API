@@ -10,7 +10,16 @@ jest.mock("../../services/twitchService", () => ({
 
 jest.mock("../../services/dbGatewayService", () => ({
   insertAchieved: jest.fn(),
+  getAchievementById: jest.fn().mockResolvedValue({
+    title: "Achievement X",
+    channelLogin: "broadcaster",
+    discordChannelId: "disc-123",
+  }),
   AlreadyAchievedError: class AlreadyAchievedError extends Error {},
+}));
+
+jest.mock("../../services/notificationService", () => ({
+  notifyAchievementUnlocked: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { verifyTwitchToken } from "../../services/twitchService";
