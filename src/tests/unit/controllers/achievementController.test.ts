@@ -16,6 +16,7 @@ jest.mock("../../../services/twitchService", () => ({
 jest.mock("../../../services/dbGatewayService", () => ({
   insertAchieved: jest.fn(),
   getAchievementById: jest.fn(),
+  isAchievementAlreadyValidated: jest.fn(),
   AlreadyAchievedError: class AlreadyAchievedError extends Error {},
 }));
 
@@ -32,12 +33,12 @@ const { verifyTwitchToken } = jest.requireMock(
 ) as {
   verifyTwitchToken: jest.Mock;
 };
-const { insertAchieved, getAchievementById } = jest.requireMock(
-  "../../../services/dbGatewayService",
-) as {
-  insertAchieved: jest.Mock;
-  getAchievementById: jest.Mock;
-};
+const { insertAchieved, getAchievementById, isAchievementAlreadyValidated } =
+  jest.requireMock("../../../services/dbGatewayService") as {
+    insertAchieved: jest.Mock;
+    getAchievementById: jest.Mock;
+    isAchievementAlreadyValidated: jest.Mock;
+  };
 const { notifyAchievementUnlocked } = jest.requireMock(
   "../../../services/notificationService",
 ) as {
@@ -63,6 +64,7 @@ function createMockResponse(): MockResponse {
 describe("achievementController", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    isAchievementAlreadyValidated.mockResolvedValue(false);
     getAchievementById.mockResolvedValue({
       title: "Achievement X",
       channelLogin: "broadcaster",
@@ -169,6 +171,21 @@ describe("achievementController", () => {
       "broadcaster",
       "123456789",
     );
+  });
+
+  it("skips notification when achievement was already validated", async () => {
+    const request = {} as Request;
+    const response = createMockResponse();
+    response.locals.userId = "u1";
+    response.locals.achievementId = "a1";
+    response.locals.twitchLogin = "streamer";
+    insertAchieved.mockResolvedValue(undefined);
+    isAchievementAlreadyValidated.mockResolvedValue(true);
+
+    await validateAchievement(request, response);
+
+    expect(notifyAchievementUnlocked).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(200);
   });
 
   it("skips notification when getAchievementById throws", async () => {

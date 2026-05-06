@@ -13,8 +13,9 @@ jest.mock("../../services/dbGatewayService", () => ({
   getAchievementById: jest.fn().mockResolvedValue({
     title: "Achievement X",
     channelLogin: "broadcaster",
-    discordChannelId: "disc-123",
+    discordChannelId: "123456789",
   }),
+  isAchievementAlreadyValidated: jest.fn().mockResolvedValue(false),
   AlreadyAchievedError: class AlreadyAchievedError extends Error {},
 }));
 

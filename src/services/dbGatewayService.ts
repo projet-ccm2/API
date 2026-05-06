@@ -75,6 +75,29 @@ export async function getAchievementById(
   };
 }
 
+/**
+ * Returns true if the user has already validated this achievement, false if it is new.
+ */
+export async function isAchievementAlreadyValidated(
+  achievementId: string,
+  userId: string,
+): Promise<boolean> {
+  const headers = await buildDbGatewayHeaders();
+  try {
+    await axios.get(`${environment.dbGatewayUrl}/achieved`, {
+      params: { achievementId, userId },
+      headers,
+      timeout: 8_000,
+    });
+    return true;
+  } catch (error: unknown) {
+    if (getStatus(error) === 404) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export async function insertAchieved(payload: AchievedPayload): Promise<void> {
   try {
     const headers = await buildDbGatewayHeaders();

@@ -4,6 +4,7 @@ import {
   AlreadyAchievedError,
   getAchievementById,
   insertAchieved,
+  isAchievementAlreadyValidated,
 } from "../../../services/dbGatewayService";
 import { buildDbGatewayHeaders } from "../../../services/vpcTokenService";
 
@@ -99,6 +100,44 @@ describe("dbGatewayService", () => {
       mockedAxios.post.mockRejectedValue(badError as never);
 
       await expect(insertAchieved(validPayload)).rejects.toBe(badError);
+    });
+  });
+
+  describe("isAchievementAlreadyValidated", () => {
+    it("returns true when GET /achieved returns 200", async () => {
+      mockedBuildHeaders.mockResolvedValue({ Authorization: "Bearer tok" });
+      mockedAxios.get.mockResolvedValue({ data: { achievementId: "ach-1", userId: "u-1" } } as never);
+
+      const result = await isAchievementAlreadyValidated("ach-1", "u-1");
+
+      expect(result).toBe(true);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        "http://localhost:3001/achieved",
+        {
+          params: { achievementId: "ach-1", userId: "u-1" },
+          headers: { Authorization: "Bearer tok" },
+          timeout: 8_000,
+        },
+      );
+    });
+
+    it("returns false when GET /achieved returns 404", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      mockedAxios.get.mockRejectedValue({ response: { status: 404 } } as never);
+
+      const result = await isAchievementAlreadyValidated("ach-1", "u-1");
+
+      expect(result).toBe(false);
+    });
+
+    it("rethrows on non-404 errors", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      const serverError = { response: { status: 500 } };
+      mockedAxios.get.mockRejectedValue(serverError as never);
+
+      await expect(
+        isAchievementAlreadyValidated("ach-1", "u-1"),
+      ).rejects.toBe(serverError);
     });
   });
 

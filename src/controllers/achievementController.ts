@@ -3,6 +3,7 @@ import {
   AlreadyAchievedError,
   getAchievementById,
   insertAchieved,
+  isAchievementAlreadyValidated,
 } from "../services/dbGatewayService";
 import { notifyAchievementUnlocked } from "../services/notificationService";
 import {
@@ -83,22 +84,29 @@ export async function validateAchievement(
       acquiredDate: new Date().toISOString(),
     };
 
+    const alreadyValidated = await isAchievementAlreadyValidated(
+      achievementId,
+      userId,
+    );
+
     await insertAchieved(achievedPayload);
 
-    const login = res.locals.twitchLogin as string;
-    try {
-      const details = await getAchievementById(achievementId);
-      await notifyAchievementUnlocked(
-        login,
-        details.title,
-        details.channelLogin,
-        details.discordChannelId,
-      );
-    } catch (err: unknown) {
-      logger.warn("Could not fetch achievement details, skipping notifications", {
-        context: "db-gateway",
-        achievementId,
-      });
+    if (!alreadyValidated) {
+      const login = res.locals.twitchLogin as string;
+      try {
+        const details = await getAchievementById(achievementId);
+        await notifyAchievementUnlocked(
+          login,
+          details.title,
+          details.channelLogin,
+          details.discordChannelId,
+        );
+      } catch (err: unknown) {
+        logger.warn(
+          "Could not fetch achievement details, skipping notifications",
+          { context: "db-gateway", achievementId },
+        );
+      }
     }
 
     // eslint-disable-next-line camelcase
