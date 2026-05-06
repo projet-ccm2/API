@@ -28,13 +28,13 @@ jobs:
       environment: integration
       cloud-run-service-name: api-int
       service_type: back_prive
-      required_env_vars: AUTH_SERVICE_URL,JWT_SECRET,TWITCH_CLIENT_ID,DB_GATEWAY_BASE_URL,TWITCH_LISTENER_URL,CHAT_API_KEY,DISCORD_NOTIF_URL
+      required_env_vars: AUTH_SERVICE_URL,JWT_SECRET,TWITCH_CLIENT_ID,DB_SERVICE_URL,TWITCH_LISTENER_URL,CHAT_API_KEY,DISCORD_NOTIF_URL
     secrets:
       GCP_SA_KEY: ${{ secrets.INT_GCP_SA_KEY }}
       GCP_PROJECT_ID: ${{ secrets.INT_GCP_PROJECT_ID }}
-      AUTH_SERVICE_URL: ${{ secrets.AUTH_SERVICE_URL }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      DB_GATEWAY_BASE_URL: ${{ secrets.DB_GATEWAY_BASE_URL }}
+      AUTH_SERVICE_URL: ${{ secrets.INT_AUTH_SERVICE_URL }}
+      JWT_SECRET: ${{ secrets.INT_JWT_SECRET }}
+      DB_SERVICE_URL: ${{ secrets.INT_DB_SERVICE_URL }}
       TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
       TWITCH_LISTENER_URL: ${{ secrets.INT_TWITCH_LISTENER_URL }}
       CHAT_API_KEY: ${{ secrets.INT_CHAT_API_KEY }}

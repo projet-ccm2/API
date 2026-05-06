@@ -74,7 +74,7 @@ describe("Environment Configuration", () => {
 
   describe("environment export", () => {
     it("uses provided env vars when set", () => {
-      process.env.DB_GATEWAY_BASE_URL = "http://custom-db:5000";
+      process.env.DB_SERVICE_URL = "http://custom-db:5000";
       process.env.AUTH_SERVICE_URL = "http://custom-auth:4000";
       process.env.TWITCH_API_URL = "https://custom.twitch.tv/oauth2";
       process.env.TWITCH_CLIENT_ID = "my-client-id";
