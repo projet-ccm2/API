@@ -125,10 +125,14 @@ describe("dbGatewayService", () => {
         "http://localhost:3001/channels/ch-1",
         { headers: { Authorization: "Bearer tok" }, timeout: 8_000 },
       );
-      expect(result).toEqual({ title: "Premier sang", channelLogin: "broadcaster" });
+      expect(result).toEqual({
+        title: "Premier sang",
+        channelLogin: "broadcaster",
+        discordChannelId: "ch-1",
+      });
     });
 
-    it("returns empty channelLogin when achievement has no channelId", async () => {
+    it("returns empty channelLogin and discordChannelId when achievement has no channelId", async () => {
       mockedBuildHeaders.mockResolvedValue({});
       mockedAxios.get.mockResolvedValueOnce({
         data: { title: "Premier sang", channelId: null },
@@ -137,7 +141,11 @@ describe("dbGatewayService", () => {
       const result = await getAchievementById("ach-1");
 
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ title: "Premier sang", channelLogin: "" });
+      expect(result).toEqual({
+        title: "Premier sang",
+        channelLogin: "",
+        discordChannelId: "",
+      });
     });
 
     it("returns empty title when achievement title is missing", async () => {
@@ -148,7 +156,11 @@ describe("dbGatewayService", () => {
 
       const result = await getAchievementById("ach-1");
 
-      expect(result).toEqual({ title: "", channelLogin: "broadcaster" });
+      expect(result).toEqual({
+        title: "",
+        channelLogin: "broadcaster",
+        discordChannelId: "ch-1",
+      });
     });
 
     it("returns empty channelLogin when channel has no name", async () => {
@@ -161,7 +173,11 @@ describe("dbGatewayService", () => {
 
       const result = await getAchievementById("ach-1");
 
-      expect(result).toEqual({ title: "Premier sang", channelLogin: "" });
+      expect(result).toEqual({
+        title: "Premier sang",
+        channelLogin: "",
+        discordChannelId: "ch-1",
+      });
     });
 
     it("rethrows when achievement fetch throws", async () => {

@@ -35,6 +35,7 @@ function getStatus(error: unknown): number | undefined {
 export type AchievementDetails = {
   title: string;
   channelLogin: string;
+  discordChannelId: string;
 };
 
 /**
@@ -57,7 +58,7 @@ export async function getAchievementById(
   const channelId = achievement["channelId"];
 
   if (!channelId) {
-    return { title, channelLogin: "" };
+    return { title, channelLogin: "", discordChannelId: "" };
   }
 
   const channelRes = await axios.get<Record<string, unknown>>(
@@ -70,6 +71,7 @@ export async function getAchievementById(
   return {
     title,
     channelLogin: String(channel["name"] ?? ""),
+    discordChannelId: String(channelId),
   };
 }
 
