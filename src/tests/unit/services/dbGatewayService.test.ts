@@ -103,53 +103,85 @@ describe("dbGatewayService", () => {
   });
 
   describe("getAchievementById", () => {
-    it("calls GET /achievements/:id with correct headers and timeout and returns data", async () => {
+    it("fetches achievement then channel and returns title + channelLogin", async () => {
       mockedBuildHeaders.mockResolvedValue({ Authorization: "Bearer tok" });
-      mockedAxios.get.mockResolvedValue({
-        data: {
-          title: "Premier sang",
-          channelLogin: "broadcaster",
-        },
-      } as never);
+      mockedAxios.get
+        .mockResolvedValueOnce({
+          data: { title: "Premier sang", channelId: "ch-1" },
+        } as never)
+        .mockResolvedValueOnce({
+          data: { id: "ch-1", name: "broadcaster" },
+        } as never);
 
       const result = await getAchievementById("ach-1");
 
-      expect(mockedAxios.get).toHaveBeenCalledWith(
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(
+        1,
         "http://localhost:3001/achievements/ach-1",
         { headers: { Authorization: "Bearer tok" }, timeout: 8_000 },
       );
-      expect(result).toEqual({
-        title: "Premier sang",
-        channelLogin: "broadcaster",
-      });
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(
+        2,
+        "http://localhost:3001/channels/ch-1",
+        { headers: { Authorization: "Bearer tok" }, timeout: 8_000 },
+      );
+      expect(result).toEqual({ title: "Premier sang", channelLogin: "broadcaster" });
     });
 
-    it("maps snake_case channel_login to channelLogin", async () => {
+    it("returns empty channelLogin when achievement has no channelId", async () => {
       mockedBuildHeaders.mockResolvedValue({});
-      mockedAxios.get.mockResolvedValue({
-        data: { title: "Premier sang", channel_login: "broadcaster" },
+      mockedAxios.get.mockResolvedValueOnce({
+        data: { title: "Premier sang", channelId: null },
       } as never);
 
       const result = await getAchievementById("ach-1");
 
-      expect(result).toEqual({ title: "Premier sang", channelLogin: "broadcaster" });
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ title: "Premier sang", channelLogin: "" });
     });
 
-    it("returns empty strings when achievement fields are missing", async () => {
+    it("returns empty title when achievement title is missing", async () => {
       mockedBuildHeaders.mockResolvedValue({});
-      mockedAxios.get.mockResolvedValue({ data: {} } as never);
+      mockedAxios.get
+        .mockResolvedValueOnce({ data: { channelId: "ch-1" } } as never)
+        .mockResolvedValueOnce({ data: { name: "broadcaster" } } as never);
 
       const result = await getAchievementById("ach-1");
 
-      expect(result).toEqual({ title: "", channelLogin: "" });
+      expect(result).toEqual({ title: "", channelLogin: "broadcaster" });
     });
 
-    it("rethrows when axios throws (caller handles fallback)", async () => {
+    it("returns empty channelLogin when channel has no name", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      mockedAxios.get
+        .mockResolvedValueOnce({
+          data: { title: "Premier sang", channelId: "ch-1" },
+        } as never)
+        .mockResolvedValueOnce({ data: { id: "ch-1" } } as never);
+
+      const result = await getAchievementById("ach-1");
+
+      expect(result).toEqual({ title: "Premier sang", channelLogin: "" });
+    });
+
+    it("rethrows when achievement fetch throws", async () => {
       mockedBuildHeaders.mockResolvedValue({});
       const networkError = new Error("Network Error");
       mockedAxios.get.mockRejectedValue(networkError as never);
 
       await expect(getAchievementById("ach-1")).rejects.toBe(networkError);
+    });
+
+    it("rethrows when channel fetch throws", async () => {
+      mockedBuildHeaders.mockResolvedValue({});
+      const channelError = new Error("Channel not found");
+      mockedAxios.get
+        .mockResolvedValueOnce({
+          data: { title: "Premier sang", channelId: "ch-1" },
+        } as never)
+        .mockRejectedValueOnce(channelError as never);
+
+      await expect(getAchievementById("ach-1")).rejects.toBe(channelError);
     });
   });
 });

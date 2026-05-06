@@ -39,20 +39,37 @@ export type AchievementDetails = {
 
 /**
  * Fetches achievement details from the DB gateway.
+ * Makes two calls: GET /achievements/:id then GET /channels/:channelId for the channel name.
  */
 export async function getAchievementById(
   achievementId: string,
 ): Promise<AchievementDetails> {
   const headers = await buildDbGatewayHeaders();
-  const response = await axios.get<Record<string, unknown>>(
+
+  const achievementRes = await axios.get<Record<string, unknown>>(
     `${environment.dbGatewayUrl}/achievements/${achievementId}`,
     { headers, timeout: 8_000 },
   );
-  const data = response.data;
-  logger.debug("Achievement details fetched", { achievementId, data });
+  const achievement = achievementRes.data;
+  logger.debug("Achievement fetched", { achievementId, data: achievement });
+
+  const title = String(achievement["title"] ?? "");
+  const channelId = achievement["channelId"];
+
+  if (!channelId) {
+    return { title, channelLogin: "" };
+  }
+
+  const channelRes = await axios.get<Record<string, unknown>>(
+    `${environment.dbGatewayUrl}/channels/${String(channelId)}`,
+    { headers, timeout: 8_000 },
+  );
+  const channel = channelRes.data;
+  logger.debug("Channel fetched", { channelId, data: channel });
+
   return {
-    title: String(data["title"] ?? ""),
-    channelLogin: String(data["channelLogin"] ?? data["channel_login"] ?? ""),
+    title,
+    channelLogin: String(channel["name"] ?? ""),
   };
 }
 
