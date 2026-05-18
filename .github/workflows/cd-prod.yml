@@ -1,0 +1,37 @@
+name: Deploy to Production
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy (e.g., v1.2.3)"
+        required: true
+        type: string
+        default: ""
+
+jobs:
+  deploy-prod:
+    name: Deploy to Production
+    uses: projet-ccm2/shared-workflows/.github/workflows/nodejs-cd.yml@main
+    if: github.event_name != 'pull_request'
+    with:
+      docker-image-name: api-api-prod
+      docker-tag: ${{ github.event.inputs.version || github.ref_name || format('prod-{0}', github.sha) }}
+      artifact-registry-repository: "api-docker-prod"
+      environment: production
+      cloud-run-service-name: api-prod
+      service_type: back_prive
+      required_env_vars: AUTH_SERVICE_URL,JWT_SECRET,TWITCH_CLIENT_ID,DB_SERVICE_URL,TWITCH_LISTENER_URL,CHAT_API_KEY,DISCORD_NOTIF_URL
+
+    secrets:
+      GCP_SA_KEY: ${{ secrets.PROD_GCP_SA_KEY }}
+      GCP_PROJECT_ID: ${{ secrets.PROD_GCP_PROJECT_ID }}
+      AUTH_SERVICE_URL: ${{ secrets.PROD_AUTH_SERVICE_URL }}
+      JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+      DB_SERVICE_URL: ${{ secrets.PROD_DB_SERVICE_URL }}
+      TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+      TWITCH_LISTENER_URL: ${{ secrets.PROD_TWITCH_LISTENER_URL }}
+      CHAT_API_KEY: ${{ secrets.PROD_CHAT_API_KEY }}
+      DISCORD_NOTIF_URL: ${{ secrets.PROD_DISCORD_NOTIF_URL }}
