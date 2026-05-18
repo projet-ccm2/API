@@ -37,7 +37,7 @@ cp .env.example .env
 | `NODE_ENV`             | No          | Environment mode (`development`, `integration`, `production`) | `development`                     |
 | `TWITCH_CLIENT_ID`     | Recommended | Twitch app client id (sent during token validate)             | empty                             |
 | `TWITCH_API_URL`       | No          | Twitch OAuth base URL                                         | `https://id.twitch.tv/oauth2`     |
-| `DB_GATEWAY_BASE_URL`  | Yes         | DB-gateway base URL                                           | `http://localhost:3001`           |
+| `DB_SERVICE_URL`       | Yes         | DB-gateway base URL                                           | `http://localhost:3001`           |
 | `AUTH_SERVICE_URL`     | Int/Prod    | User-management URL for VPC token flow                        | `http://localhost:3000`           |
 | `JWT_SECRET`           | Int/Prod    | Secret used by VPC token architecture                         | `dev-secret-change-in-production` |
 | `RATE_LIMIT_WINDOW_MS` | No          | Rate-limit window per user                                    | `60000`                           |

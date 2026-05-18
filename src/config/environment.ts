@@ -40,13 +40,19 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parsePort(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  if (Number.isNaN(parsed) || parsed <= 0 || parsed > 65535) return fallback;
+  return parsed;
+}
+
 export const environment: RequiredEnvironment = {
   dbGatewayUrl: process.env.DB_SERVICE_URL ?? "http://localhost:3001",
   authServiceUrl: process.env.AUTH_SERVICE_URL ?? "http://localhost:3000",
   twitchApiUrl: process.env.TWITCH_API_URL ?? "https://id.twitch.tv/oauth2",
   twitchClientId: process.env.TWITCH_CLIENT_ID ?? "",
   nodeEnv: process.env.NODE_ENV ?? "development",
-  port: parseNumber(process.env.PORT, 3000),
+  port: parsePort(process.env.PORT, 3000),
   rateLimitWindowMs: parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
   rateLimitMax: parseNumber(process.env.RATE_LIMIT_MAX, 30),
   twitchListenerUrl: process.env.TWITCH_LISTENER_URL ?? "http://localhost:3002",
