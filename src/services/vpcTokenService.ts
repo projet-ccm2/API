@@ -1,121 +1,64 @@
-import axios from "axios";
-import { GoogleAuth } from "google-auth-library";
-import { Buffer } from "node:buffer";
-import { environment } from "../config/environment";
+import jwt from "jsonwebtoken";
 
-const REFRESH_BUFFER_SECONDS = 60;
+const VPC_AUDIENCE = "vpc-db-gateway";
+const TOKEN_TTL_MS = 55 * 60 * 1000;
 
-let cachedToken: string | null = null;
-let cachedTokenExp = 0;
+const identityTokenCache = new Map<
+  string,
+  { token: string; expiresAt: number }
+>();
 
-function nowSeconds(): number {
-  return Math.floor(Date.now() / 1000);
+export function isCloudRun(): boolean {
+  return Boolean(process.env.K_SERVICE);
 }
 
-function parseJwtExp(token: string): number | null {
-  const parts = token.split(".");
-  if (parts.length < 2) {
-    return null;
-  }
-
-  try {
-    const payloadPart = parts[1];
-    const base64 = payloadPart.replaceAll("-", "+").replaceAll("_", "/");
-    const json = Buffer.from(base64, "base64").toString("utf8");
-    const parsed = JSON.parse(json) as { exp?: unknown };
-    return typeof parsed.exp === "number" ? parsed.exp : null;
-  } catch {
-    return null;
-  }
+export function generateVpcToken(): string | null {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
+  return jwt.sign(
+    { aud: VPC_AUDIENCE, iat: Math.floor(Date.now() / 1000) },
+    secret,
+    { expiresIn: 3600 },
+  );
 }
 
-function isTokenStillValid(): boolean {
-  if (!cachedToken) {
-    return false;
-  }
-  const now = nowSeconds();
-  return cachedTokenExp > now + REFRESH_BUFFER_SECONDS;
+function extractAudience(url: string): string {
+  const parsed = new URL(url);
+  return `${parsed.protocol}//${parsed.host}`;
 }
 
-function cacheToken(token: string): void {
-  const exp = parseJwtExp(token);
-  const now = nowSeconds();
-  cachedToken = token;
-  cachedTokenExp = exp ?? now + 3600;
-}
-
-async function getGcpAuthorizationHeader(audience: string): Promise<string> {
-  const auth = new GoogleAuth();
-  const client = await auth.getIdTokenClient(audience);
-  const headers = (await client.getRequestHeaders(audience)) as unknown;
-  const isHeadersLike =
-    typeof headers === "object" &&
-    headers !== null &&
-    "get" in headers &&
-    typeof (headers as { get?: unknown }).get === "function";
-  const headersWithGet = headers as { get?: unknown };
-  const headerGetter = headersWithGet.get as any;
-  const headerValue = isHeadersLike
-    ? (headerGetter("Authorization") ?? headerGetter("authorization") ?? null)
-    : ((headers as { Authorization?: string; authorization?: string })
-        .Authorization ??
-      (headers as { Authorization?: string; authorization?: string })
-        .authorization);
-  if (!headerValue || typeof headerValue !== "string") {
-    throw new Error("Unable to obtain GCP identity token");
-  }
-  return headerValue;
-}
-
-export function resetVpcTokenCache(): void {
-  cachedToken = null;
-  cachedTokenExp = 0;
-}
-
-export async function getVpcToken(): Promise<string> {
-  if (isTokenStillValid()) {
-    return cachedToken as string;
-  }
-
-  const tokenUrl = `${environment.authServiceUrl.replace(/\/$/, "")}/tokens`;
-  const isDevelopment = environment.nodeEnv === "development";
-
-  const headers: Record<string, string> = {};
-  if (!isDevelopment) {
-    headers.Authorization = await getGcpAuthorizationHeader(
-      environment.authServiceUrl,
+async function fetchIdentityToken(audience: string): Promise<string> {
+  const cached = identityTokenCache.get(audience);
+  if (cached && Date.now() < cached.expiresAt) return cached.token;
+  const url = `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`;
+  const r = await fetch(url, { headers: { "Metadata-Flavor": "Google" } });
+  if (!r.ok) {
+    throw new Error(
+      `Failed to fetch identity token for ${audience} (HTTP ${r.status})`,
     );
   }
-
-  const response = await axios.post<{ token?: string }>(tokenUrl, undefined, {
-    headers,
-    timeout: 8_000,
+  const token = await r.text();
+  identityTokenCache.set(audience, {
+    token,
+    expiresAt: Date.now() + TOKEN_TTL_MS,
   });
-
-  const token = response.data.token;
-  if (!token || typeof token !== "string") {
-    throw new Error("Invalid token response from user-management");
-  }
-
-  cacheToken(token);
   return token;
 }
 
+export function resetVpcTokenCache(): void {
+  identityTokenCache.clear();
+}
+
 export async function buildDbGatewayHeaders(): Promise<Record<string, string>> {
-  const vpcToken = await getVpcToken();
-  const isDevelopment = environment.nodeEnv === "development";
+  if (!isCloudRun()) return {};
 
-  if (isDevelopment) {
-    return {
-      Authorization: `Bearer ${vpcToken}`,
-    };
-  }
-
-  const authorization = await getGcpAuthorizationHeader(
-    environment.dbGatewayUrl,
-  );
-  return {
-    Authorization: authorization,
-    "X-VPC-Token": vpcToken,
+  const dbUrl = process.env.DB_SERVICE_URL ?? "http://localhost:3001";
+  const audience = extractAudience(dbUrl);
+  const idToken = await fetchIdentityToken(audience);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${idToken}`,
   };
+  const vpcToken = generateVpcToken();
+  if (vpcToken) headers["x-vpc-token"] = vpcToken;
+  return headers;
 }
