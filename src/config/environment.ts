@@ -23,7 +23,6 @@ function validateConfig(): Config {
 
 type RequiredEnvironment = {
   dbGatewayUrl: string;
-  authServiceUrl: string;
   twitchApiUrl: string;
   twitchClientId: string;
   nodeEnv: string;
@@ -48,7 +47,6 @@ function parsePort(value: string | undefined, fallback: number): number {
 
 export const environment: RequiredEnvironment = {
   dbGatewayUrl: process.env.DB_SERVICE_URL ?? "http://localhost:3001",
-  authServiceUrl: process.env.AUTH_SERVICE_URL ?? "http://localhost:3000",
   twitchApiUrl: process.env.TWITCH_API_URL ?? "https://id.twitch.tv/oauth2",
   twitchClientId: process.env.TWITCH_CLIENT_ID ?? "",
   nodeEnv: process.env.NODE_ENV ?? "development",

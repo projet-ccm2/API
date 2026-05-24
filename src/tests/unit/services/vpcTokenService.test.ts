@@ -1,215 +1,166 @@
-import axios from "axios";
-import { Buffer } from "node:buffer";
-import { environment } from "../../../config/environment";
+import jwt from "jsonwebtoken";
 import {
   buildDbGatewayHeaders,
-  getVpcToken,
+  generateVpcToken,
+  isCloudRun,
   resetVpcTokenCache,
 } from "../../../services/vpcTokenService";
 
-const mockGetRequestHeaders = jest.fn();
-const mockGetIdTokenClient = jest.fn();
-
-jest.mock("axios");
-jest.mock("google-auth-library", () => ({
-  GoogleAuth: class MockGoogleAuth {
-    getIdTokenClient = mockGetIdTokenClient;
-  },
-}));
-
-function makeJwtWithExp(exp: number): string {
-  const header = Buffer.from(
-    JSON.stringify({ alg: "HS256", typ: "JWT" }),
-  ).toString("base64url");
-  const payload = Buffer.from(JSON.stringify({ exp })).toString("base64url");
-  return `${header}.${payload}.signature`;
-}
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
 
 describe("vpcTokenService", () => {
-  const mockedAxios = axios as jest.Mocked<typeof axios>;
+  const originalEnv = process.env;
 
   beforeEach(() => {
     jest.resetAllMocks();
     resetVpcTokenCache();
-    environment.nodeEnv = "development";
-    environment.authServiceUrl = "http://localhost:3000";
-    environment.dbGatewayUrl = "http://localhost:3001";
-    mockGetIdTokenClient.mockResolvedValue({
-      getRequestHeaders: mockGetRequestHeaders,
+    process.env = { ...originalEnv };
+    delete process.env.K_SERVICE;
+    delete process.env.JWT_SECRET;
+    delete process.env.DB_SERVICE_URL;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  describe("isCloudRun", () => {
+    it("returns false when K_SERVICE is not set", () => {
+      expect(isCloudRun()).toBe(false);
+    });
+
+    it("returns true when K_SERVICE is set", () => {
+      process.env.K_SERVICE = "my-service";
+      expect(isCloudRun()).toBe(true);
     });
   });
 
-  it("gets token in development and uses cache", async () => {
-    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
-    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
-
-    const first = await getVpcToken();
-    const second = await getVpcToken();
-
-    expect(first).toBe(token);
-    expect(second).toBe(token);
-    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-  });
-
-  it("refreshes token when cached token is expired", async () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
-
-    const now = Math.floor(Date.now() / 1000);
-    const token1 = makeJwtWithExp(now + 30);
-    const token2 = makeJwtWithExp(now + 3600);
-    mockedAxios.post
-      .mockResolvedValueOnce({ data: { token: token1 } } as never)
-      .mockResolvedValueOnce({ data: { token: token2 } } as never);
-
-    const first = await getVpcToken();
-    const second = await getVpcToken();
-
-    expect(first).toBe(token1);
-    expect(second).toBe(token2);
-    expect(mockedAxios.post).toHaveBeenCalledTimes(2);
-
-    jest.useRealTimers();
-  });
-
-  it("builds double headers in production", async () => {
-    environment.nodeEnv = "production";
-    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
-    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
-    mockGetRequestHeaders
-      .mockResolvedValueOnce({ Authorization: "Bearer gcp-user-management" })
-      .mockResolvedValueOnce({ Authorization: "Bearer gcp-db-gateway" });
-
-    const headers = await buildDbGatewayHeaders();
-
-    expect(headers).toEqual({
-      Authorization: "Bearer gcp-db-gateway",
-      "X-VPC-Token": token,
-    });
-    expect(mockGetIdTokenClient).toHaveBeenCalledTimes(2);
-  });
-
-  it("builds single Bearer header in development", async () => {
-    environment.nodeEnv = "development";
-    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
-    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
-
-    const headers = await buildDbGatewayHeaders();
-
-    expect(headers).toEqual({ Authorization: `Bearer ${token}` });
-    expect(mockGetIdTokenClient).not.toHaveBeenCalled();
-  });
-
-  it("caches token when JWT has no exp (token without dots, parts.length < 2)", async () => {
-    mockedAxios.post.mockResolvedValue({
-      data: { token: "plaintoken" },
-    } as never);
-
-    const first = await getVpcToken();
-    const second = await getVpcToken();
-
-    expect(first).toBe("plaintoken");
-    expect(second).toBe("plaintoken");
-    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-  });
-
-  it("caches token when JWT payload has no numeric exp field", async () => {
-    const header = Buffer.from(JSON.stringify({ alg: "HS256" })).toString(
-      "base64url",
-    );
-    const payload = Buffer.from(JSON.stringify({ sub: "user" })).toString(
-      "base64url",
-    );
-    const tokenNoExp = `${header}.${payload}.sig`;
-    mockedAxios.post.mockResolvedValue({
-      data: { token: tokenNoExp },
-    } as never);
-
-    const first = await getVpcToken();
-    const second = await getVpcToken();
-
-    expect(first).toBe(tokenNoExp);
-    expect(second).toBe(tokenNoExp);
-    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-  });
-
-  it("caches token when JWT payload is not valid JSON", async () => {
-    const header = Buffer.from("{}").toString("base64url");
-    const badPayload = "!!!not-json!!!";
-    const token = `${header}.${badPayload}.sig`;
-    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
-
-    const first = await getVpcToken();
-    const second = await getVpcToken();
-
-    expect(first).toBe(token);
-    expect(second).toBe(token);
-    expect(mockedAxios.post).toHaveBeenCalledTimes(1);
-  });
-
-  it("throws when getVpcToken response has no token field", async () => {
-    mockedAxios.post.mockResolvedValue({ data: {} } as never);
-
-    await expect(getVpcToken()).rejects.toThrow(
-      "Invalid token response from user-management",
-    );
-  });
-
-  it("throws when GCP headers have no Authorization field (plain object)", async () => {
-    environment.nodeEnv = "production";
-    mockGetRequestHeaders.mockResolvedValue({});
-
-    await expect(getVpcToken()).rejects.toThrow(
-      "Unable to obtain GCP identity token",
-    );
-  });
-
-  it("throws when headers.get() returns null for both Authorization variants", async () => {
-    environment.nodeEnv = "production";
-    mockGetRequestHeaders.mockResolvedValue({
-      get: (_key: string) => null,
+  describe("generateVpcToken", () => {
+    it("returns null when JWT_SECRET is not set", () => {
+      expect(generateVpcToken()).toBeNull();
     });
 
-    await expect(getVpcToken()).rejects.toThrow(
-      "Unable to obtain GCP identity token",
-    );
+    it("returns a signed JWT with correct audience when JWT_SECRET is set", () => {
+      process.env.JWT_SECRET = "test-secret";
+      const token = generateVpcToken();
+      expect(token).toBeTruthy();
+      const decoded = jwt.verify(token as string, "test-secret") as {
+        aud: string;
+      };
+      expect(decoded.aud).toBe("vpc-db-gateway");
+    });
   });
 
-  it("extracts Authorization via headers.get() method", async () => {
-    environment.nodeEnv = "production";
-    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
-    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
-    mockGetRequestHeaders
-      .mockResolvedValueOnce({
-        get: (key: string) =>
-          key === "Authorization" ? "Bearer gcp-via-get" : null,
-      })
-      .mockResolvedValueOnce({
-        get: (key: string) =>
-          key === "Authorization" ? "Bearer gcp-db-via-get" : null,
+  describe("buildDbGatewayHeaders", () => {
+    it("returns empty headers when not running in Cloud Run", async () => {
+      const headers = await buildDbGatewayHeaders();
+      expect(headers).toEqual({});
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns Authorization + x-vpc-token when in Cloud Run with JWT_SECRET", async () => {
+      process.env.K_SERVICE = "api-dev";
+      process.env.JWT_SECRET = "test-secret";
+      process.env.DB_SERVICE_URL = "http://db-gateway:3001";
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "gcp-identity-token",
       });
 
-    const headers = await buildDbGatewayHeaders();
+      const headers = await buildDbGatewayHeaders();
 
-    expect(headers.Authorization).toBe("Bearer gcp-db-via-get");
-  });
+      expect(headers.Authorization).toBe("Bearer gcp-identity-token");
+      expect(headers["x-vpc-token"]).toBeTruthy();
+      const decoded = jwt.verify(headers["x-vpc-token"], "test-secret") as {
+        aud: string;
+      };
+      expect(decoded.aud).toBe("vpc-db-gateway");
+    });
 
-  it("extracts Authorization via headers.get() using lowercase fallback", async () => {
-    environment.nodeEnv = "production";
-    const token = makeJwtWithExp(Math.floor(Date.now() / 1000) + 3600);
-    mockedAxios.post.mockResolvedValue({ data: { token } } as never);
-    mockGetRequestHeaders
-      .mockResolvedValueOnce({
-        get: (key: string) =>
-          key === "authorization" ? "Bearer gcp-lowercase" : null,
-      })
-      .mockResolvedValueOnce({
-        get: (key: string) =>
-          key === "authorization" ? "Bearer gcp-db-lowercase" : null,
+    it("returns Authorization only (no x-vpc-token) when JWT_SECRET is absent in Cloud Run", async () => {
+      process.env.K_SERVICE = "api-dev";
+      process.env.DB_SERVICE_URL = "http://db-gateway:3001";
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "gcp-identity-token",
       });
 
-    const headers = await buildDbGatewayHeaders();
+      const headers = await buildDbGatewayHeaders();
 
-    expect(headers.Authorization).toBe("Bearer gcp-db-lowercase");
+      expect(headers.Authorization).toBe("Bearer gcp-identity-token");
+      expect(headers["x-vpc-token"]).toBeUndefined();
+    });
+
+    it("uses DB_SERVICE_URL origin as audience for the metadata request", async () => {
+      process.env.K_SERVICE = "api-dev";
+      process.env.DB_SERVICE_URL = "https://db.example.com/path";
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "token",
+      });
+
+      await buildDbGatewayHeaders();
+
+      const calledUrl: string = mockFetch.mock.calls[0][0] as string;
+      expect(calledUrl).toContain(
+        encodeURIComponent("https://db.example.com"),
+      );
+    });
+
+    it("throws when the metadata fetch fails", async () => {
+      process.env.K_SERVICE = "api-dev";
+      process.env.DB_SERVICE_URL = "http://db-gateway:3001";
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 503 });
+
+      await expect(buildDbGatewayHeaders()).rejects.toThrow(
+        "Failed to fetch identity token",
+      );
+    });
+
+    it("caches the identity token and only fetches once", async () => {
+      process.env.K_SERVICE = "api-dev";
+      process.env.DB_SERVICE_URL = "http://db-gateway:3001";
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: async () => "cached-token",
+      });
+
+      await buildDbGatewayHeaders();
+      await buildDbGatewayHeaders();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("refetches after resetVpcTokenCache", async () => {
+      process.env.K_SERVICE = "api-dev";
+      process.env.DB_SERVICE_URL = "http://db-gateway:3001";
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: async () => "token",
+      });
+
+      await buildDbGatewayHeaders();
+      resetVpcTokenCache();
+      await buildDbGatewayHeaders();
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses fallback URL when DB_SERVICE_URL is not set", async () => {
+      process.env.K_SERVICE = "api-dev";
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "token-fallback",
+      });
+
+      const headers = await buildDbGatewayHeaders();
+
+      expect(headers.Authorization).toBe("Bearer token-fallback");
+      const calledUrl: string = mockFetch.mock.calls[0][0] as string;
+      expect(calledUrl).toContain(
+        encodeURIComponent("http://localhost:3001"),
+      );
+    });
   });
 });
