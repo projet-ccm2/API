@@ -103,9 +103,7 @@ describe("vpcTokenService", () => {
       await buildDbGatewayHeaders();
 
       const calledUrl: string = mockFetch.mock.calls[0][0] as string;
-      expect(calledUrl).toContain(
-        encodeURIComponent("https://db.example.com"),
-      );
+      expect(calledUrl).toContain(encodeURIComponent("https://db.example.com"));
     });
 
     it("throws when the metadata fetch fails", async () => {
@@ -158,9 +156,7 @@ describe("vpcTokenService", () => {
 
       expect(headers.Authorization).toBe("Bearer token-fallback");
       const calledUrl: string = mockFetch.mock.calls[0][0] as string;
-      expect(calledUrl).toContain(
-        encodeURIComponent("http://localhost:3001"),
-      );
+      expect(calledUrl).toContain(encodeURIComponent("http://localhost:3001"));
     });
   });
 });

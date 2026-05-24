@@ -3,7 +3,10 @@ import jwt from "jsonwebtoken";
 const VPC_AUDIENCE = "vpc-db-gateway";
 const TOKEN_TTL_MS = 55 * 60 * 1000;
 
-const identityTokenCache = new Map<string, { token: string; expiresAt: number }>();
+const identityTokenCache = new Map<
+  string,
+  { token: string; expiresAt: number }
+>();
 
 export function isCloudRun(): boolean {
   return Boolean(process.env.K_SERVICE);
@@ -35,7 +38,10 @@ async function fetchIdentityToken(audience: string): Promise<string> {
     );
   }
   const token = await r.text();
-  identityTokenCache.set(audience, { token, expiresAt: Date.now() + TOKEN_TTL_MS });
+  identityTokenCache.set(audience, {
+    token,
+    expiresAt: Date.now() + TOKEN_TTL_MS,
+  });
   return token;
 }
 
@@ -49,7 +55,9 @@ export async function buildDbGatewayHeaders(): Promise<Record<string, string>> {
   const dbUrl = process.env.DB_SERVICE_URL ?? "http://localhost:3001";
   const audience = extractAudience(dbUrl);
   const idToken = await fetchIdentityToken(audience);
-  const headers: Record<string, string> = { Authorization: `Bearer ${idToken}` };
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${idToken}`,
+  };
   const vpcToken = generateVpcToken();
   if (vpcToken) headers["x-vpc-token"] = vpcToken;
   return headers;
